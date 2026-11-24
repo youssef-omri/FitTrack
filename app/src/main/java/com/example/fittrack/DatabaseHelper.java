@@ -15,7 +15,7 @@ import java.util.Map;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "fittrack.db";
-    private static final int DATABASE_VERSION = 1;
+    private static final int DATABASE_VERSION = 2;
 
     // Table: users
     public static final String TABLE_USERS = "users";
@@ -47,6 +47,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_HISTORY_SETS_DONE = "sets_done";
     public static final String COLUMN_HISTORY_WEIGHT_USED = "weight_used";
     public static final String COLUMN_HISTORY_DATE = "date";
+    public static final String COLUMN_HISTORY_DURATION = "duration";
 
     public DatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -95,6 +96,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 + COLUMN_HISTORY_SETS_DONE + " INTEGER NOT NULL, "
                 + COLUMN_HISTORY_WEIGHT_USED + " REAL NOT NULL, "
                 + COLUMN_HISTORY_DATE + " TEXT NOT NULL, "
+                + COLUMN_HISTORY_DURATION + " TEXT DEFAULT '', "
                 + "FOREIGN KEY(" + COLUMN_HISTORY_USER_ID + ") REFERENCES " + TABLE_USERS + "(" + COLUMN_USER_ID + ") ON DELETE CASCADE"
                 + ");";
 
@@ -106,11 +108,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_WORKOUT_HISTORY);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_WORKOUT_EXERCISES);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_WORKOUTS);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_USERS);
-        onCreate(db);
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE " + TABLE_WORKOUT_HISTORY
+                    + " ADD COLUMN " + COLUMN_HISTORY_DURATION + " TEXT DEFAULT '';");
+        }
     }
 
     /**
@@ -266,6 +267,44 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
+     * Updates an existing custom workout routine's name and replaces its exercises.
+     */
+    public boolean updateCustomWorkout(long workoutId, String workoutName, List<Exercise> exercises) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            ContentValues workoutValues = new ContentValues();
+            workoutValues.put(COLUMN_WORKOUT_NAME, workoutName);
+            int rows = db.update(TABLE_WORKOUTS, workoutValues,
+                    COLUMN_WORKOUT_ID + " = ?",
+                    new String[]{String.valueOf(workoutId)});
+            if (rows <= 0) {
+                return false;
+            }
+
+            db.delete(TABLE_WORKOUT_EXERCISES,
+                    COLUMN_EXERCISE_WORKOUT_ID + " = ?",
+                    new String[]{String.valueOf(workoutId)});
+
+            if (exercises != null) {
+                for (Exercise exercise : exercises) {
+                    insertExerciseInternal(db, workoutId,
+                            exercise.getExerciseName(),
+                            exercise.getSets(),
+                            exercise.getReps(),
+                            exercise.getWeight());
+                }
+            }
+            db.setTransactionSuccessful();
+            return true;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /**
      * Adds an exercise to an existing workout.
      */
     public long addExerciseToWorkout(long workoutId, String exerciseName, int sets, int reps, double weight) {
@@ -387,6 +426,13 @@ public class DatabaseHelper extends SQLiteOpenHelper {
      * Log a workout exercise to history.
      */
     public long logWorkoutHistory(long userId, String workoutName, String exerciseName, int setsDone, double weightUsed, String date) {
+        return logWorkoutHistory(userId, workoutName, exerciseName, setsDone, weightUsed, date, "");
+    }
+
+    /**
+     * Log a workout exercise to history along with the total workout duration.
+     */
+    public long logWorkoutHistory(long userId, String workoutName, String exerciseName, int setsDone, double weightUsed, String date, String duration) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put(COLUMN_HISTORY_USER_ID, userId);
@@ -395,6 +441,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         values.put(COLUMN_HISTORY_SETS_DONE, setsDone);
         values.put(COLUMN_HISTORY_WEIGHT_USED, weightUsed);
         values.put(COLUMN_HISTORY_DATE, date);
+        values.put(COLUMN_HISTORY_DURATION, duration != null ? duration : "");
         return db.insert(TABLE_WORKOUT_HISTORY, null, values);
     }
 
@@ -434,8 +481,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     int setsDone = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_HISTORY_SETS_DONE));
                     double weightUsed = cursor.getDouble(cursor.getColumnIndexOrThrow(COLUMN_HISTORY_WEIGHT_USED));
                     String date = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_HISTORY_DATE));
+                    int durationIndex = cursor.getColumnIndex(COLUMN_HISTORY_DURATION);
+                    String duration = (durationIndex >= 0 && !cursor.isNull(durationIndex))
+                            ? cursor.getString(durationIndex)
+                            : "";
 
-                    chronologicalList.add(new WorkoutHistoryItem(id, userId, workoutName, exerciseName, setsDone, weightUsed, date));
+                    chronologicalList.add(new WorkoutHistoryItem(id, userId, workoutName, exerciseName, setsDone, weightUsed, date, duration));
                 }
             } finally {
                 cursor.close();

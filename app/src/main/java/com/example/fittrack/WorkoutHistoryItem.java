@@ -10,6 +10,7 @@ public class WorkoutHistoryItem implements Serializable {
     private int setsDone;
     private double weightUsed;
     private String date;
+    private String duration;
 
     // Personal progress comparison fields against previous session of the same exercise
     private boolean hasPrevious;
@@ -20,6 +21,10 @@ public class WorkoutHistoryItem implements Serializable {
     }
 
     public WorkoutHistoryItem(long id, long userId, String workoutName, String exerciseName, int setsDone, double weightUsed, String date) {
+        this(id, userId, workoutName, exerciseName, setsDone, weightUsed, date, "");
+    }
+
+    public WorkoutHistoryItem(long id, long userId, String workoutName, String exerciseName, int setsDone, double weightUsed, String date, String duration) {
         this.id = id;
         this.userId = userId;
         this.workoutName = workoutName;
@@ -27,6 +32,7 @@ public class WorkoutHistoryItem implements Serializable {
         this.setsDone = setsDone;
         this.weightUsed = weightUsed;
         this.date = date;
+        this.duration = duration;
         this.hasPrevious = false;
     }
 
@@ -84,6 +90,14 @@ public class WorkoutHistoryItem implements Serializable {
 
     public void setDate(String date) {
         this.date = date;
+    }
+
+    public String getDuration() {
+        return duration != null ? duration : "";
+    }
+
+    public void setDuration(String duration) {
+        this.duration = duration;
     }
 
     public boolean hasPrevious() {

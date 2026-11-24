@@ -6,6 +6,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -20,6 +21,7 @@ public class WorkoutAdapter extends RecyclerView.Adapter<WorkoutAdapter.WorkoutV
 
     public interface OnWorkoutClickListener {
         void onWorkoutClick(Workout workout);
+        void onEditWorkoutClick(Workout workout);
     }
 
     private final Context context;
@@ -61,6 +63,7 @@ public class WorkoutAdapter extends RecyclerView.Adapter<WorkoutAdapter.WorkoutV
     class WorkoutViewHolder extends RecyclerView.ViewHolder {
         private final TextView tvWorkoutTitle;
         private final TextView tvExerciseCountBadge;
+        private final ImageButton btnEditWorkout;
         private final LinearLayout llExercisePreviewList;
         private final Button btnStartWorkout;
 
@@ -68,6 +71,7 @@ public class WorkoutAdapter extends RecyclerView.Adapter<WorkoutAdapter.WorkoutV
             super(itemView);
             tvWorkoutTitle = itemView.findViewById(R.id.tvWorkoutTitle);
             tvExerciseCountBadge = itemView.findViewById(R.id.tvExerciseCountBadge);
+            btnEditWorkout = itemView.findViewById(R.id.btnEditWorkout);
             llExercisePreviewList = itemView.findViewById(R.id.llExercisePreviewList);
             btnStartWorkout = itemView.findViewById(R.id.btnStartWorkout);
         }
@@ -111,6 +115,15 @@ public class WorkoutAdapter extends RecyclerView.Adapter<WorkoutAdapter.WorkoutV
 
             itemView.setOnClickListener(clickListener);
             btnStartWorkout.setOnClickListener(clickListener);
+
+            btnEditWorkout.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (listener != null) {
+                        listener.onEditWorkoutClick(workout);
+                    }
+                }
+            });
         }
     }
 }

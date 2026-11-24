@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="84dp"
+    android:height="84dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Clean Anatomical Anterior Silhouette -->
+    <path
+        android:fillColor="@color/muscle_silhouette"
+        android:pathData="M50,5.5 A6.5,6.5 0 1,0 50,18.5 A6.5,6.5 0 1,0 50,5.5 Z" />
+    <path
+        android:fillColor="@color/muscle_silhouette"
+        android:pathData="M45,18 L55,18 L55,22 L66,24 L71,28 L74,38 L76,45 L80,56 L81,61 L77,62 L75,55 L71,44 L66,34 L64,44 L62,50 L64,56 L65,68 L64,77 L65,85 L63,94 L59,95 L58,85 L57,76 L53,60 L50,58 L47,60 L43,76 L42,85 L41,95 L37,94 L35,85 L36,77 L35,68 L36,56 L38,50 L36,44 L34,34 L29,44 L25,55 L23,62 L19,61 L20,56 L24,45 L26,38 L29,28 L34,24 L45,22 Z" />
+    <!-- Highlighted Muscle: Abs & Core (Rectus Abdominis 6-pack + Obliques) -->
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M44,37 L49,37 L49,41 L44,41 Z M51,37 L56,37 L56,41 L51,41 Z M44,42.5 L49,42.5 L49,46.5 L44,46.5 Z M51,42.5 L56,42.5 L56,46.5 L51,46.5 Z M44.5,48 L49,48 L49,53 L45.5,53 Z M51,48 L55.5,48 L54.5,53 L51,53 Z" />
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M38,40 L42,42 L42,51 L39,50 Z" />
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M62,40 L58,42 L58,51 L61,50 Z" />
+</vector>

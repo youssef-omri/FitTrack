@@ -47,7 +47,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Bench Press"
-                android:textColor="@color/text_primary"
+                android:textColor="?android:attr/textColorPrimary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
@@ -57,7 +57,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="Routine Target: 3 sets × 10 reps @ 60.0 kg"
-                android:textColor="@color/text_secondary"
+                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="12sp" />
 
         </LinearLayout>
@@ -105,7 +105,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Sets Lifted Today"
-                android:textColor="@color/text_secondary"
+                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
@@ -118,7 +118,8 @@
                 android:gravity="center"
                 android:hint="3"
                 android:inputType="number"
-                android:textColor="@color/text_primary"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textColorHint="?android:attr/textColorHint"
                 android:textSize="14sp" />
         </LinearLayout>
 
@@ -138,7 +139,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Weight Lifted (kg)"
-                android:textColor="@color/text_secondary"
+                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="11sp"
                 android:textStyle="bold" />
 
@@ -151,7 +152,8 @@
                 android:gravity="center"
                 android:hint="60.0"
                 android:inputType="numberDecimal"
-                android:textColor="@color/text_primary"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textColorHint="?android:attr/textColorHint"
                 android:textSize="14sp" />
         </LinearLayout>
 

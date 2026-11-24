@@ -33,7 +33,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Tuesday, Nov 24, 2026"
-                android:textColor="@color/text_primary"
+                android:textColor="?android:attr/textColorPrimary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
@@ -43,10 +43,25 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
                 android:text="3 exercises logged"
-                android:textColor="@color/text_secondary"
+                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="12sp" />
 
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvDateGroupDuration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_badge_neutral"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp"
+            android:text="⏱ 45 min"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
 
     </LinearLayout>
 

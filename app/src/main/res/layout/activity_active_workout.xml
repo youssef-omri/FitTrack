@@ -3,14 +3,14 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_light"
+    android:background="?android:attr/colorBackground"
     android:orientation="vertical">
 
-    <!-- Top Action Bar -->
+    <!-- Top Action Bar (no duplicate Finish button) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/surface"
+        android:background="?attr/colorSurface"
         android:elevation="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
@@ -39,7 +39,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Active Workout"
-                android:textColor="@color/text_primary"
+                android:textColor="?android:attr/textColorPrimary"
                 android:textSize="18sp"
                 android:textStyle="bold" />
 
@@ -53,21 +53,6 @@
                 android:textStyle="bold" />
 
         </LinearLayout>
-
-        <Button
-            android:id="@+id/btnHeaderFinish"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:background="@drawable/bg_button_primary"
-            android:minHeight="0dp"
-            android:minWidth="0dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:text="Finish ✓"
-            android:textAllCaps="false"
-            android:textColor="@color/white"
-            android:textSize="12sp"
-            android:textStyle="bold" />
 
     </LinearLayout>
 
@@ -83,14 +68,15 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- Customizable Rest Timer Card -->
+            <!-- Live Workout Duration Stopwatch Card -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_timer_card"
+                android:background="@drawable/bg_card"
                 android:elevation="3dp"
+                android:gravity="center_horizontal"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="18dp">
 
                 <!-- Header Row -->
                 <LinearLayout
@@ -104,151 +90,59 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:letterSpacing="0.08"
-                        android:text="⏱ REST COUNTDOWN TIMER"
-                        android:textColor="#94A3B8"
+                        android:text="@string/workout_duration_label"
+                        android:textColor="?android:attr/textColorSecondary"
                         android:textSize="12sp"
                         android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/tvTimerStatus"
+                        android:id="@+id/tvStopwatchStatus"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Ready"
-                        android:textColor="#38BDF8"
-                        android:textSize="12sp"
+                        android:background="@drawable/bg_badge_success"
+                        android:paddingStart="8dp"
+                        android:paddingTop="3dp"
+                        android:paddingEnd="8dp"
+                        android:paddingBottom="3dp"
+                        android:text="@string/stopwatch_running"
+                        android:textColor="@color/accent"
+                        android:textSize="11sp"
                         android:textStyle="bold" />
 
                 </LinearLayout>
 
-                <!-- Big Countdown Display -->
+                <!-- Big HH:MM:SS Stopwatch Display -->
                 <TextView
-                    android:id="@+id/tvTimerCountdown"
+                    android:id="@+id/tvStopwatchTime"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center_horizontal"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginBottom="4dp"
-                    android:text="01:00"
-                    android:textColor="#38BDF8"
-                    android:textSize="44sp"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="14dp"
+                    android:fontFamily="monospace"
+                    android:text="00:00:00"
+                    android:textColor="?attr/colorPrimary"
+                    android:textSize="42sp"
                     android:textStyle="bold" />
 
-                <!-- Preset Interval Selection Row -->
-                <LinearLayout
-                    android:layout_width="match_parent"
+                <!-- Pause / Resume Toggle Button -->
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnStopwatchToggle"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_button_primary"
+                    android:drawableStart="@drawable/ic_pause"
+                    android:drawablePadding="8dp"
                     android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/btnTimer30s"
-                        android:layout_width="0dp"
-                        android:layout_height="34dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_button_secondary"
-                        android:minHeight="0dp"
-                        android:text="30s"
-                        android:textAllCaps="false"
-                        android:textColor="@color/primary"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <Button
-                        android:id="@+id/btnTimer60s"
-                        android:layout_width="0dp"
-                        android:layout_height="34dp"
-                        android:layout_marginStart="6dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_button_secondary"
-                        android:minHeight="0dp"
-                        android:text="60s"
-                        android:textAllCaps="false"
-                        android:textColor="@color/primary"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <Button
-                        android:id="@+id/btnTimer90s"
-                        android:layout_width="0dp"
-                        android:layout_height="34dp"
-                        android:layout_marginStart="6dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_button_secondary"
-                        android:minHeight="0dp"
-                        android:text="90s"
-                        android:textAllCaps="false"
-                        android:textColor="@color/primary"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <Button
-                        android:id="@+id/btnTimerCustom"
-                        android:layout_width="0dp"
-                        android:layout_height="34dp"
-                        android:layout_marginStart="6dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_button_secondary"
-                        android:minHeight="0dp"
-                        android:text="Custom"
-                        android:textAllCaps="false"
-                        android:textColor="@color/primary"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                </LinearLayout>
-
-                <!-- Controls: Start, Pause, Reset Buttons -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/btnTimerStart"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_button_primary"
-                        android:backgroundTint="@color/accent"
-                        android:minHeight="0dp"
-                        android:text="Start ▶"
-                        android:textAllCaps="false"
-                        android:textColor="@color/white"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <Button
-                        android:id="@+id/btnTimerPause"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_button_secondary"
-                        android:minHeight="0dp"
-                        android:text="Pause ⏸"
-                        android:textAllCaps="false"
-                        android:textColor="@color/primary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <Button
-                        android:id="@+id/btnTimerReset"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_button_secondary"
-                        android:minHeight="0dp"
-                        android:text="Reset 🔄"
-                        android:textAllCaps="false"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                </LinearLayout>
+                    android:minHeight="44dp"
+                    android:paddingStart="20dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="20dp"
+                    android:paddingBottom="8dp"
+                    android:text="@string/pause_stopwatch"
+                    android:textAllCaps="false"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
             </LinearLayout>
 
@@ -266,7 +160,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Workout Exercises"
-                    android:textColor="@color/text_primary"
+                    android:textColor="?android:attr/textColorPrimary"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
@@ -275,7 +169,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="0 / 0 completed"
-                    android:textColor="@color/text_secondary"
+                    android:textColor="?android:attr/textColorSecondary"
                     android:textSize="12sp"
                     android:textStyle="bold" />
 
@@ -293,21 +187,21 @@
 
     </ScrollView>
 
-    <!-- Bottom Bar: Finish Workout Button -->
+    <!-- Single Bottom Bar: Finish Workout Button -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/surface"
+        android:background="?attr/colorSurface"
         android:elevation="8dp"
         android:orientation="vertical"
         android:padding="16dp">
 
-        <Button
+        <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnFinishWorkout"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:background="@drawable/bg_button_primary"
-            android:text="Finish Workout ✓"
+            android:text="@string/finish_workout"
             android:textAllCaps="false"
             android:textColor="@color/white"
             android:textSize="15sp"

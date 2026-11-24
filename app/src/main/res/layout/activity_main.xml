@@ -3,14 +3,14 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_light"
+    android:background="?android:attr/colorBackground"
     android:orientation="vertical">
 
     <!-- Top App Bar / Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/surface"
+        android:background="?attr/colorSurface"
         android:elevation="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
@@ -20,15 +20,16 @@
         android:paddingBottom="14dp">
 
         <ImageView
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
             android:contentDescription="@string/app_name"
             android:src="@drawable/ic_fitness_center" />
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="8dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -36,21 +37,35 @@
                 android:id="@+id/tvWelcomeUser"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:text="Welcome!"
-                android:textColor="@color/text_primary"
-                android:textSize="18sp"
+                android:textColor="?android:attr/textColorPrimary"
+                android:textSize="17sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="FitTrack Dashboard"
-                android:textColor="@color/text_secondary"
+                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="12sp" />
         </LinearLayout>
 
+        <!-- Dark / Light Mode Toggle Button -->
+        <ImageButton
+            android:id="@+id/btnThemeToggle"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_badge_neutral"
+            android:contentDescription="@string/toggle_theme"
+            android:padding="7dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_dark_mode" />
+
         <!-- History Button -->
-        <Button
+        <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnHistory"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
@@ -62,12 +77,12 @@
             android:paddingEnd="10dp"
             android:text="History 📜"
             android:textAllCaps="false"
-            android:textColor="@color/primary"
+            android:textColor="?attr/colorPrimary"
             android:textSize="12sp"
             android:textStyle="bold" />
 
         <!-- Logout Button -->
-        <Button
+        <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnLogout"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
@@ -108,7 +123,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Workout Routines"
-                    android:textColor="@color/text_primary"
+                    android:textColor="?android:attr/textColorPrimary"
                     android:textSize="20sp"
                     android:textStyle="bold" />
 
@@ -117,11 +132,11 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
                     android:text="Tap any routine to start tracking"
-                    android:textColor="@color/text_secondary"
+                    android:textColor="?android:attr/textColorSecondary"
                     android:textSize="13sp" />
             </LinearLayout>
 
-            <Button
+            <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnCreateWorkout"
                 android:layout_width="wrap_content"
                 android:layout_height="40dp"
@@ -159,7 +174,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="No Workout Routines Found"
-                android:textColor="@color/text_primary"
+                android:textColor="?android:attr/textColorPrimary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
@@ -168,7 +183,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:text="Create a new routine to begin tracking your exercises."
-                android:textColor="@color/text_secondary"
+                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="13sp" />
 
         </LinearLayout>

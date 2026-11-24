@@ -22,4 +22,18 @@
     <string name="registration_success">Registration successful!</string>
     <string name="login_success">Login successful!</string>
     <string name="logout">Log Out</string>
+    <string name="toggle_theme">Toggle dark or light mode</string>
+    <string name="create_routine_title">Create Workout Routine</string>
+    <string name="edit_routine_title">Edit Workout Routine</string>
+    <string name="select_muscle_group">Select Muscle Group</string>
+    <string name="add_custom_exercise_to_muscle">+ Add Custom Exercise to this Muscle</string>
+    <string name="add_exercise_to_routine">Add Exercise to Routine</string>
+    <string name="workout_duration_label">WORKOUT DURATION</string>
+    <string name="edit_routine">Edit routine</string>
+    <string name="pause_stopwatch">Pause</string>
+    <string name="resume_stopwatch">Resume</string>
+    <string name="stopwatch_running">Recording session</string>
+    <string name="stopwatch_paused">Paused</string>
+    <string name="finish_workout">Finish Workout ✓</string>
+    <string name="back_to_muscle_groups">All Muscle Groups</string>
 </resources>

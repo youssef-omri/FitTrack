@@ -3,18 +3,19 @@ package com.example.fittrack;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.CountDownTimer;
-import android.text.InputType;
-import android.text.TextUtils;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -26,6 +27,10 @@ import java.util.Locale;
 
 public class ActiveWorkoutActivity extends AppCompatActivity implements ActiveExerciseAdapter.OnExerciseStatusChangeListener {
 
+    private static final String STATE_ACCUMULATED_MS = "state_accumulated_ms";
+    private static final String STATE_START_ELAPSED_MS = "state_start_elapsed_ms";
+    private static final String STATE_IS_RUNNING = "state_is_running";
+
     private SessionManager sessionManager;
     private DatabaseHelper databaseHelper;
 
@@ -36,18 +41,11 @@ public class ActiveWorkoutActivity extends AppCompatActivity implements ActiveEx
     private ImageButton btnBack;
     private TextView tvActiveWorkoutTitle;
     private TextView tvActiveWorkoutSubtitle;
-    private Button btnHeaderFinish;
 
-    // Timer views
-    private TextView tvTimerCountdown;
-    private TextView tvTimerStatus;
-    private Button btnTimer30s;
-    private Button btnTimer60s;
-    private Button btnTimer90s;
-    private Button btnTimerCustom;
-    private Button btnTimerStart;
-    private Button btnTimerPause;
-    private Button btnTimerReset;
+    // Stopwatch views
+    private TextView tvStopwatchTime;
+    private TextView tvStopwatchStatus;
+    private Button btnStopwatchToggle;
 
     // Exercise list views
     private TextView tvCompletedCounter;
@@ -58,11 +56,21 @@ public class ActiveWorkoutActivity extends AppCompatActivity implements ActiveEx
     private List<Exercise> exerciseList;
     private ActiveExerciseAdapter exerciseAdapter;
 
-    // Countdown Timer logic
-    private CountDownTimer countDownTimer;
-    private long totalDurationMillis = 60000; // default: 60s
-    private long timeLeftMillis = 60000;
-    private boolean isTimerRunning = false;
+    // Upward-counting Workout Duration Stopwatch
+    private final Handler stopwatchHandler = new Handler(Looper.getMainLooper());
+    private long startTimeElapsedMs = 0L;
+    private long accumulatedTimeMs = 0L;
+    private boolean isStopwatchRunning = false;
+
+    private final Runnable stopwatchRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (isStopwatchRunning) {
+                updateStopwatchDisplay();
+                stopwatchHandler.postDelayed(this, 1000L);
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,7 +94,7 @@ public class ActiveWorkoutActivity extends AppCompatActivity implements ActiveEx
         }
 
         initializeViews();
-        setupTimerControls();
+        setupStopwatch(savedInstanceState);
         loadWorkoutExercises();
     }
 
@@ -94,17 +102,10 @@ public class ActiveWorkoutActivity extends AppCompatActivity implements ActiveEx
         btnBack = findViewById(R.id.btnBack);
         tvActiveWorkoutTitle = findViewById(R.id.tvActiveWorkoutTitle);
         tvActiveWorkoutSubtitle = findViewById(R.id.tvActiveWorkoutSubtitle);
-        btnHeaderFinish = findViewById(R.id.btnHeaderFinish);
 
-        tvTimerCountdown = findViewById(R.id.tvTimerCountdown);
-        tvTimerStatus = findViewById(R.id.tvTimerStatus);
-        btnTimer30s = findViewById(R.id.btnTimer30s);
-        btnTimer60s = findViewById(R.id.btnTimer60s);
-        btnTimer90s = findViewById(R.id.btnTimer90s);
-        btnTimerCustom = findViewById(R.id.btnTimerCustom);
-        btnTimerStart = findViewById(R.id.btnTimerStart);
-        btnTimerPause = findViewById(R.id.btnTimerPause);
-        btnTimerReset = findViewById(R.id.btnTimerReset);
+        tvStopwatchTime = findViewById(R.id.tvStopwatchTime);
+        tvStopwatchStatus = findViewById(R.id.tvStopwatchStatus);
+        btnStopwatchToggle = findViewById(R.id.btnStopwatchToggle);
 
         tvCompletedCounter = findViewById(R.id.tvCompletedCounter);
         rvActiveExercises = findViewById(R.id.rvActiveExercises);
@@ -119,162 +120,111 @@ public class ActiveWorkoutActivity extends AppCompatActivity implements ActiveEx
             }
         });
 
-        View.OnClickListener finishClickListener = new View.OnClickListener() {
+        btnStopwatchToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (isStopwatchRunning) {
+                    pauseStopwatch();
+                } else {
+                    startStopwatch();
+                }
+            }
+        });
+
+        btnFinishWorkout.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 finishAndSaveWorkout();
             }
-        };
-
-        btnHeaderFinish.setOnClickListener(finishClickListener);
-        btnFinishWorkout.setOnClickListener(finishClickListener);
-    }
-
-    private void setupTimerControls() {
-        updateTimerDisplay();
-
-        btnTimer30s.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                setTimerDuration(30);
-            }
-        });
-
-        btnTimer60s.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                setTimerDuration(60);
-            }
-        });
-
-        btnTimer90s.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                setTimerDuration(90);
-            }
-        });
-
-        btnTimerCustom.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showCustomTimerDialog();
-            }
-        });
-
-        btnTimerStart.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startTimer();
-            }
-        });
-
-        btnTimerPause.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                pauseTimer();
-            }
-        });
-
-        btnTimerReset.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                resetTimer();
-            }
         });
     }
 
-    private void setTimerDuration(int seconds) {
-        pauseTimer();
-        totalDurationMillis = seconds * 1000L;
-        timeLeftMillis = totalDurationMillis;
-        tvTimerStatus.setText("Ready (" + seconds + "s)");
-        updateTimerDisplay();
-    }
-
-    private void showCustomTimerDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Custom Rest Timer");
-        builder.setMessage("Enter rest duration in seconds:");
-
-        final EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        input.setHint("e.g. 45");
-        builder.setView(input);
-
-        builder.setPositiveButton("Set", new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                String val = input.getText().toString().trim();
-                if (!TextUtils.isEmpty(val)) {
-                    try {
-                        int sec = Integer.parseInt(val);
-                        if (sec > 0 && sec <= 600) {
-                            setTimerDuration(sec);
-                        } else {
-                            Toast.makeText(ActiveWorkoutActivity.this, "Enter duration between 1 and 600s", Toast.LENGTH_SHORT).show();
-                        }
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
+    private void setupStopwatch(Bundle savedInstanceState) {
+        if (savedInstanceState != null) {
+            accumulatedTimeMs = savedInstanceState.getLong(STATE_ACCUMULATED_MS, 0L);
+            startTimeElapsedMs = savedInstanceState.getLong(STATE_START_ELAPSED_MS, SystemClock.elapsedRealtime());
+            isStopwatchRunning = savedInstanceState.getBoolean(STATE_IS_RUNNING, true);
+            if (isStopwatchRunning) {
+                stopwatchHandler.removeCallbacks(stopwatchRunnable);
+                stopwatchHandler.post(stopwatchRunnable);
             }
-        });
-        builder.setNegativeButton("Cancel", null);
-        builder.show();
+            updateStopwatchDisplay();
+            updateStopwatchControlsUI();
+        } else {
+            // Start upward-counting stopwatch automatically upon entering ActiveWorkoutActivity
+            startStopwatch();
+        }
     }
 
-    private void startTimer() {
-        if (isTimerRunning) {
+    private void startStopwatch() {
+        if (isStopwatchRunning) {
             return;
         }
-
-        if (timeLeftMillis <= 0) {
-            timeLeftMillis = totalDurationMillis;
-        }
-
-        countDownTimer = new CountDownTimer(timeLeftMillis, 1000) {
-            @Override
-            public void onTick(long millisUntilFinished) {
-                timeLeftMillis = millisUntilFinished;
-                updateTimerDisplay();
-            }
-
-            @Override
-            public void onFinish() {
-                isTimerRunning = false;
-                timeLeftMillis = 0;
-                updateTimerDisplay();
-                tvTimerStatus.setText("Time's up! Ready for next set! 🎉");
-                Toast.makeText(ActiveWorkoutActivity.this, "Rest complete! Time for the next set!", Toast.LENGTH_LONG).show();
-            }
-        }.start();
-
-        isTimerRunning = true;
-        tvTimerStatus.setText("Resting...");
+        startTimeElapsedMs = SystemClock.elapsedRealtime();
+        isStopwatchRunning = true;
+        stopwatchHandler.removeCallbacks(stopwatchRunnable);
+        stopwatchHandler.post(stopwatchRunnable);
+        updateStopwatchControlsUI();
     }
 
-    private void pauseTimer() {
-        if (countDownTimer != null) {
-            countDownTimer.cancel();
+    private void pauseStopwatch() {
+        if (!isStopwatchRunning) {
+            return;
         }
-        isTimerRunning = false;
-        tvTimerStatus.setText("Paused");
+        accumulatedTimeMs += Math.max(0L, SystemClock.elapsedRealtime() - startTimeElapsedMs);
+        isStopwatchRunning = false;
+        stopwatchHandler.removeCallbacks(stopwatchRunnable);
+        updateStopwatchDisplay();
+        updateStopwatchControlsUI();
     }
 
-    private void resetTimer() {
-        if (countDownTimer != null) {
-            countDownTimer.cancel();
+    private long getElapsedMillis() {
+        if (isStopwatchRunning) {
+            return accumulatedTimeMs + Math.max(0L, SystemClock.elapsedRealtime() - startTimeElapsedMs);
         }
-        isTimerRunning = false;
-        timeLeftMillis = totalDurationMillis;
-        updateTimerDisplay();
-        tvTimerStatus.setText("Ready");
+        return accumulatedTimeMs;
     }
 
-    private void updateTimerDisplay() {
-        int totalSeconds = (int) (timeLeftMillis / 1000);
-        int minutes = totalSeconds / 60;
-        int seconds = totalSeconds % 60;
-        tvTimerCountdown.setText(String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds));
+    private void updateStopwatchDisplay() {
+        long totalSeconds = getElapsedMillis() / 1000L;
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
+        tvStopwatchTime.setText(String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds));
+    }
+
+    private void updateStopwatchControlsUI() {
+        if (isStopwatchRunning) {
+            btnStopwatchToggle.setText(R.string.pause_stopwatch);
+            btnStopwatchToggle.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_pause, 0, 0, 0);
+            tvStopwatchStatus.setText(R.string.stopwatch_running);
+            tvStopwatchStatus.setBackgroundResource(R.drawable.bg_badge_success);
+            tvStopwatchStatus.setTextColor(ContextCompat.getColor(this, R.color.accent));
+            tvActiveWorkoutSubtitle.setText("In Progress");
+        } else {
+            btnStopwatchToggle.setText(R.string.resume_stopwatch);
+            btnStopwatchToggle.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_play, 0, 0, 0);
+            tvStopwatchStatus.setText(R.string.stopwatch_paused);
+            tvStopwatchStatus.setBackgroundResource(R.drawable.bg_badge_neutral);
+            tvStopwatchStatus.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
+            tvActiveWorkoutSubtitle.setText("Paused");
+        }
+    }
+
+    private String formatDurationForHistory(long elapsedMillis) {
+        long totalSeconds = elapsedMillis / 1000L;
+        long totalMinutes = totalSeconds / 60L;
+        if (totalMinutes >= 60L) {
+            long hours = totalMinutes / 60L;
+            long remainingMinutes = totalMinutes % 60L;
+            return remainingMinutes > 0
+                    ? hours + "h " + remainingMinutes + " min"
+                    : hours + "h";
+        } else if (totalMinutes >= 1L) {
+            return totalMinutes + " min";
+        } else {
+            return Math.max(1L, totalSeconds) + " sec";
+        }
     }
 
     private void loadWorkoutExercises() {
@@ -309,7 +259,7 @@ public class ActiveWorkoutActivity extends AppCompatActivity implements ActiveEx
     }
 
     /**
-     * Saves every completed exercise with today's date into workout_history.
+     * Saves every completed exercise with today's date and total workout duration into workout_history.
      */
     private void finishAndSaveWorkout() {
         if (exerciseList == null || exerciseList.isEmpty()) {
@@ -349,16 +299,32 @@ public class ActiveWorkoutActivity extends AppCompatActivity implements ActiveEx
     }
 
     private void saveCompletedExercisesToHistory(List<Exercise> completedList) {
+        long elapsedMillis = getElapsedMillis();
+        pauseStopwatch();
+        String formattedDuration = formatDurationForHistory(elapsedMillis);
+
         long userId = sessionManager.getUserId();
         String todayDate = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
 
         for (Exercise ex : completedList) {
             int setsDone = ex.getCurrentSets() > 0 ? ex.getCurrentSets() : ex.getSets();
             double weightUsed = ex.getCurrentWeight() >= 0 ? ex.getCurrentWeight() : ex.getWeight();
-            databaseHelper.logWorkoutHistory(userId, workoutName, ex.getExerciseName(), setsDone, weightUsed, todayDate);
+            databaseHelper.logWorkoutHistory(
+                    userId,
+                    workoutName,
+                    ex.getExerciseName(),
+                    setsDone,
+                    weightUsed,
+                    todayDate,
+                    formattedDuration
+            );
         }
 
-        Toast.makeText(this, "🎉 Workout saved! " + completedList.size() + " exercises logged to history.", Toast.LENGTH_LONG).show();
+        Toast.makeText(
+                this,
+                "🎉 Workout saved (" + formattedDuration + ")! " + completedList.size() + " exercises logged to history.",
+                Toast.LENGTH_LONG
+        ).show();
 
         // Navigate to HistoryActivity so the user can immediately view their progress
         Intent intent = new Intent(ActiveWorkoutActivity.this, HistoryActivity.class);
@@ -381,6 +347,14 @@ public class ActiveWorkoutActivity extends AppCompatActivity implements ActiveEx
     }
 
     @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putLong(STATE_ACCUMULATED_MS, accumulatedTimeMs);
+        outState.putLong(STATE_START_ELAPSED_MS, startTimeElapsedMs);
+        outState.putBoolean(STATE_IS_RUNNING, isStopwatchRunning);
+    }
+
+    @Override
     public void onBackPressed() {
         confirmExit();
     }
@@ -388,8 +362,6 @@ public class ActiveWorkoutActivity extends AppCompatActivity implements ActiveEx
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (countDownTimer != null) {
-            countDownTimer.cancel();
-        }
+        stopwatchHandler.removeCallbacks(stopwatchRunnable);
     }
 }

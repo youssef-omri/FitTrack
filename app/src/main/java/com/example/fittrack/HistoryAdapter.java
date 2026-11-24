@@ -1,6 +1,7 @@
 package com.example.fittrack;
 
 import android.content.Context;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,9 +13,12 @@ import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.HistoryGroupViewHolder> {
 
@@ -47,12 +51,14 @@ public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.HistoryG
     class HistoryGroupViewHolder extends RecyclerView.ViewHolder {
         private final TextView tvDateGroupTitle;
         private final TextView tvDateGroupSubtitle;
+        private final TextView tvDateGroupDuration;
         private final LinearLayout llDateExercisesContainer;
 
         public HistoryGroupViewHolder(@NonNull View itemView) {
             super(itemView);
             tvDateGroupTitle = itemView.findViewById(R.id.tvDateGroupTitle);
             tvDateGroupSubtitle = itemView.findViewById(R.id.tvDateGroupSubtitle);
+            tvDateGroupDuration = itemView.findViewById(R.id.tvDateGroupDuration);
             llDateExercisesContainer = itemView.findViewById(R.id.llDateExercisesContainer);
         }
 
@@ -62,8 +68,22 @@ public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.HistoryG
             int count = group.getItemCount();
             tvDateGroupSubtitle.setText(count + (count == 1 ? " exercise logged" : " exercises logged"));
 
-            llDateExercisesContainer.removeAllViews();
             List<WorkoutHistoryItem> items = group.getItems();
+            Set<String> distinctDurations = new LinkedHashSet<>();
+            for (WorkoutHistoryItem item : items) {
+                String d = item.getDuration().trim();
+                if (!TextUtils.isEmpty(d)) {
+                    distinctDurations.add(d);
+                }
+            }
+            if (!distinctDurations.isEmpty()) {
+                tvDateGroupDuration.setText("⏱ " + TextUtils.join(" • ", new ArrayList<>(distinctDurations)));
+                tvDateGroupDuration.setVisibility(View.VISIBLE);
+            } else {
+                tvDateGroupDuration.setVisibility(View.GONE);
+            }
+
+            llDateExercisesContainer.removeAllViews();
             for (int i = 0; i < items.size(); i++) {
                 WorkoutHistoryItem item = items.get(i);
                 View exerciseView = LayoutInflater.from(context).inflate(R.layout.item_history_exercise, llDateExercisesContainer, false);
@@ -81,7 +101,12 @@ public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.HistoryG
                 }
 
                 tvName.setText(item.getExerciseName());
-                tvWorkout.setText("from " + item.getWorkoutName());
+                String durationStr = item.getDuration().trim();
+                if (!TextUtils.isEmpty(durationStr)) {
+                    tvWorkout.setText("from " + item.getWorkoutName() + " • ⏱ " + durationStr);
+                } else {
+                    tvWorkout.setText("from " + item.getWorkoutName());
+                }
 
                 String weightStr = item.getWeightUsed() > 0 ? item.getWeightUsed() + " kg" : "Bodyweight";
                 tvPerformance.setText(weightStr + " • " + item.getSetsDone() + " sets");

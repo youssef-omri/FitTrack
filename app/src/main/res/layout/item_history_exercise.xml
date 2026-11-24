@@ -24,7 +24,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Bench Press"
-                android:textColor="@color/text_primary"
+                android:textColor="?android:attr/textColorPrimary"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -34,7 +34,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="1dp"
                 android:text="Chest Day"
-                android:textColor="@color/text_secondary"
+                android:textColor="?android:attr/textColorSecondary"
                 android:textSize="12sp" />
 
         </LinearLayout>
@@ -70,7 +70,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="65.0 kg • 3 sets"
-            android:textColor="@color/text_primary"
+            android:textColor="?android:attr/textColorPrimary"
             android:textSize="13sp"
             android:textStyle="bold" />
 
@@ -79,7 +79,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Previous: 60.0 kg"
-            android:textColor="@color/text_secondary"
+            android:textColor="?android:attr/textColorSecondary"
             android:textSize="12sp" />
 
     </LinearLayout>
@@ -90,6 +90,6 @@
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:layout_marginTop="8dp"
-        android:background="#F1F5F9" />
+        android:background="@color/border" />
 
 </LinearLayout>
