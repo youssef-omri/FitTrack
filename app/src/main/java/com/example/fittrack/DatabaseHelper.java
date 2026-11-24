@@ -1,0 +1,292 @@
+package com.example.fittrack;
+
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class DatabaseHelper extends SQLiteOpenHelper {
+
+    private static final String DATABASE_NAME = "fittrack.db";
+    private static final int DATABASE_VERSION = 1;
+
+    // Table: users
+    public static final String TABLE_USERS = "users";
+    public static final String COLUMN_USER_ID = "id";
+    public static final String COLUMN_USER_USERNAME = "username";
+    public static final String COLUMN_USER_PASSWORD = "password";
+
+    // Table: workouts
+    public static final String TABLE_WORKOUTS = "workouts";
+    public static final String COLUMN_WORKOUT_ID = "id";
+    public static final String COLUMN_WORKOUT_USER_ID = "user_id";
+    public static final String COLUMN_WORKOUT_NAME = "name";
+
+    // Table: workout_exercises
+    public static final String TABLE_WORKOUT_EXERCISES = "workout_exercises";
+    public static final String COLUMN_EXERCISE_ID = "id";
+    public static final String COLUMN_EXERCISE_WORKOUT_ID = "workout_id";
+    public static final String COLUMN_EXERCISE_NAME = "exercise_name";
+    public static final String COLUMN_EXERCISE_SETS = "sets";
+    public static final String COLUMN_EXERCISE_REPS = "reps";
+    public static final String COLUMN_EXERCISE_WEIGHT = "weight";
+
+    // Table: workout_history
+    public static final String TABLE_WORKOUT_HISTORY = "workout_history";
+    public static final String COLUMN_HISTORY_ID = "id";
+    public static final String COLUMN_HISTORY_USER_ID = "user_id";
+    public static final String COLUMN_HISTORY_WORKOUT_NAME = "workout_name";
+    public static final String COLUMN_HISTORY_EXERCISE_NAME = "exercise_name";
+    public static final String COLUMN_HISTORY_SETS_DONE = "sets_done";
+    public static final String COLUMN_HISTORY_WEIGHT_USED = "weight_used";
+    public static final String COLUMN_HISTORY_DATE = "date";
+
+    public DatabaseHelper(Context context) {
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+    }
+
+    @Override
+    public void onConfigure(SQLiteDatabase db) {
+        super.onConfigure(db);
+        db.setForeignKeyConstraintsEnabled(true);
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        // Create users table
+        String createUsersTable = "CREATE TABLE " + TABLE_USERS + " ("
+                + COLUMN_USER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                + COLUMN_USER_USERNAME + " TEXT UNIQUE NOT NULL, "
+                + COLUMN_USER_PASSWORD + " TEXT NOT NULL"
+                + ");";
+
+        // Create workouts table
+        String createWorkoutsTable = "CREATE TABLE " + TABLE_WORKOUTS + " ("
+                + COLUMN_WORKOUT_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                + COLUMN_WORKOUT_USER_ID + " INTEGER NOT NULL, "
+                + COLUMN_WORKOUT_NAME + " TEXT NOT NULL, "
+                + "FOREIGN KEY(" + COLUMN_WORKOUT_USER_ID + ") REFERENCES " + TABLE_USERS + "(" + COLUMN_USER_ID + ") ON DELETE CASCADE"
+                + ");";
+
+        // Create workout_exercises table
+        String createWorkoutExercisesTable = "CREATE TABLE " + TABLE_WORKOUT_EXERCISES + " ("
+                + COLUMN_EXERCISE_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                + COLUMN_EXERCISE_WORKOUT_ID + " INTEGER NOT NULL, "
+                + COLUMN_EXERCISE_NAME + " TEXT NOT NULL, "
+                + COLUMN_EXERCISE_SETS + " INTEGER NOT NULL, "
+                + COLUMN_EXERCISE_REPS + " INTEGER NOT NULL, "
+                + COLUMN_EXERCISE_WEIGHT + " REAL NOT NULL, "
+                + "FOREIGN KEY(" + COLUMN_EXERCISE_WORKOUT_ID + ") REFERENCES " + TABLE_WORKOUTS + "(" + COLUMN_WORKOUT_ID + ") ON DELETE CASCADE"
+                + ");";
+
+        // Create workout_history table
+        String createWorkoutHistoryTable = "CREATE TABLE " + TABLE_WORKOUT_HISTORY + " ("
+                + COLUMN_HISTORY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, "
+                + COLUMN_HISTORY_USER_ID + " INTEGER NOT NULL, "
+                + COLUMN_HISTORY_WORKOUT_NAME + " TEXT NOT NULL, "
+                + COLUMN_HISTORY_EXERCISE_NAME + " TEXT NOT NULL, "
+                + COLUMN_HISTORY_SETS_DONE + " INTEGER NOT NULL, "
+                + COLUMN_HISTORY_WEIGHT_USED + " REAL NOT NULL, "
+                + COLUMN_HISTORY_DATE + " TEXT NOT NULL, "
+                + "FOREIGN KEY(" + COLUMN_HISTORY_USER_ID + ") REFERENCES " + TABLE_USERS + "(" + COLUMN_USER_ID + ") ON DELETE CASCADE"
+                + ");";
+
+        db.execSQL(createUsersTable);
+        db.execSQL(createWorkoutsTable);
+        db.execSQL(createWorkoutExercisesTable);
+        db.execSQL(createWorkoutHistoryTable);
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_WORKOUT_HISTORY);
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_WORKOUT_EXERCISES);
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_WORKOUTS);
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_USERS);
+        onCreate(db);
+    }
+
+    /**
+     * Registers a new user and pre-populates default workout templates.
+     * @param username user name
+     * @param password user password
+     * @return newly generated user ID, or -1 if registration failed or user already exists
+     */
+    public long registerUser(String username, String password) {
+        if (checkUserExists(username)) {
+            return -1;
+        }
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        long userId = -1;
+
+        try {
+            ContentValues userValues = new ContentValues();
+            userValues.put(COLUMN_USER_USERNAME, username.trim());
+            userValues.put(COLUMN_USER_PASSWORD, password);
+
+            userId = db.insert(TABLE_USERS, null, userValues);
+
+            if (userId != -1) {
+                // Pre-populate 3 default workout templates for the new user
+                prepopulateDefaultWorkouts(db, userId);
+                db.setTransactionSuccessful();
+            }
+        } catch (Exception e) {
+            userId = -1;
+        } finally {
+            db.endTransaction();
+        }
+
+        return userId;
+    }
+
+    /**
+     * Pre-populates default workouts for a registered user:
+     * 1. 'Chest Day' (Bench Press, Incline Dumbbell Press, Push-ups)
+     * 2. 'Back Day' (Pull-ups, Barbell Row, Lat Pulldown)
+     * 3. 'Leg Day' (Squats, Lunges, Leg Press)
+     */
+    private void prepopulateDefaultWorkouts(SQLiteDatabase db, long userId) {
+        // 1. Chest Day
+        long chestDayId = insertWorkoutInternal(db, userId, "Chest Day");
+        if (chestDayId != -1) {
+            insertExerciseInternal(db, chestDayId, "Bench Press", 3, 10, 60.0);
+            insertExerciseInternal(db, chestDayId, "Incline Dumbbell Press", 3, 10, 20.0);
+            insertExerciseInternal(db, chestDayId, "Push-ups", 3, 15, 0.0);
+        }
+
+        // 2. Back Day
+        long backDayId = insertWorkoutInternal(db, userId, "Back Day");
+        if (backDayId != -1) {
+            insertExerciseInternal(db, backDayId, "Pull-ups", 3, 8, 0.0);
+            insertExerciseInternal(db, backDayId, "Barbell Row", 3, 10, 50.0);
+            insertExerciseInternal(db, backDayId, "Lat Pulldown", 3, 12, 45.0);
+        }
+
+        // 3. Leg Day
+        long legDayId = insertWorkoutInternal(db, userId, "Leg Day");
+        if (legDayId != -1) {
+            insertExerciseInternal(db, legDayId, "Squats", 4, 10, 70.0);
+            insertExerciseInternal(db, legDayId, "Lunges", 3, 12, 15.0);
+            insertExerciseInternal(db, legDayId, "Leg Press", 3, 12, 100.0);
+        }
+    }
+
+    private long insertWorkoutInternal(SQLiteDatabase db, long userId, String workoutName) {
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_WORKOUT_USER_ID, userId);
+        values.put(COLUMN_WORKOUT_NAME, workoutName);
+        return db.insert(TABLE_WORKOUTS, null, values);
+    }
+
+    private long insertExerciseInternal(SQLiteDatabase db, long workoutId, String exerciseName, int sets, int reps, double weight) {
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_EXERCISE_WORKOUT_ID, workoutId);
+        values.put(COLUMN_EXERCISE_NAME, exerciseName);
+        values.put(COLUMN_EXERCISE_SETS, sets);
+        values.put(COLUMN_EXERCISE_REPS, reps);
+        values.put(COLUMN_EXERCISE_WEIGHT, weight);
+        return db.insert(TABLE_WORKOUT_EXERCISES, null, values);
+    }
+
+    /**
+     * Checks if a user already exists with the given username.
+     */
+    public boolean checkUserExists(String username) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_USERS,
+                    new String[]{COLUMN_USER_ID},
+                    COLUMN_USER_USERNAME + " = ?",
+                    new String[]{username.trim()},
+                    null, null, null);
+            return (cursor != null && cursor.moveToFirst());
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    /**
+     * Authenticates user credentials.
+     * @return user ID if authenticated successfully, or -1 otherwise.
+     */
+    public long authenticateUser(String username, String password) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.query(TABLE_USERS,
+                    new String[]{COLUMN_USER_ID},
+                    COLUMN_USER_USERNAME + " = ? AND " + COLUMN_USER_PASSWORD + " = ?",
+                    new String[]{username.trim(), password},
+                    null, null, null);
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_USER_ID));
+            }
+            return -1;
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    /**
+     * Get all workouts for a specific user.
+     */
+    public Cursor getUserWorkouts(long userId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        return db.query(TABLE_WORKOUTS,
+                null,
+                COLUMN_WORKOUT_USER_ID + " = ?",
+                new String[]{String.valueOf(userId)},
+                null, null, COLUMN_WORKOUT_ID + " ASC");
+    }
+
+    /**
+     * Get all exercises for a given workout.
+     */
+    public Cursor getWorkoutExercises(long workoutId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        return db.query(TABLE_WORKOUT_EXERCISES,
+                null,
+                COLUMN_EXERCISE_WORKOUT_ID + " = ?",
+                new String[]{String.valueOf(workoutId)},
+                null, null, COLUMN_EXERCISE_ID + " ASC");
+    }
+
+    /**
+     * Log a workout exercise to history.
+     */
+    public long logWorkoutHistory(long userId, String workoutName, String exerciseName, int setsDone, double weightUsed, String date) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_HISTORY_USER_ID, userId);
+        values.put(COLUMN_HISTORY_WORKOUT_NAME, workoutName);
+        values.put(COLUMN_HISTORY_EXERCISE_NAME, exerciseName);
+        values.put(COLUMN_HISTORY_SETS_DONE, setsDone);
+        values.put(COLUMN_HISTORY_WEIGHT_USED, weightUsed);
+        values.put(COLUMN_HISTORY_DATE, date);
+        return db.insert(TABLE_WORKOUT_HISTORY, null, values);
+    }
+
+    /**
+     * Get workout history for a specific user.
+     */
+    public Cursor getUserWorkoutHistory(long userId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        return db.query(TABLE_WORKOUT_HISTORY,
+                null,
+                COLUMN_HISTORY_USER_ID + " = ?",
+                new String[]{String.valueOf(userId)},
+                null, null, COLUMN_HISTORY_DATE + " DESC");
+    }
+}

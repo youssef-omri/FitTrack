@@ -1,3 +1,25 @@
 <resources>
     <string name="app_name">FitTrack</string>
+    <string name="login_title">Welcome Back</string>
+    <string name="login_subtitle">Sign in to continue your fitness journey</string>
+    <string name="register_title">Create Account</string>
+    <string name="register_subtitle">Start tracking your workouts today</string>
+    <string name="username_hint">Username</string>
+    <string name="password_hint">Password</string>
+    <string name="confirm_password_hint">Confirm Password</string>
+    <string name="remember_me">Remember me</string>
+    <string name="btn_login">Log In</string>
+    <string name="btn_register">Sign Up</string>
+    <string name="dont_have_account">Don\'t have an account? Register</string>
+    <string name="already_have_account">Already have an account? Sign In</string>
+    <string name="error_empty_username">Please enter your username</string>
+    <string name="error_short_username">Username must be at least 3 characters</string>
+    <string name="error_empty_password">Please enter your password</string>
+    <string name="error_short_password">Password must be at least 4 characters</string>
+    <string name="error_password_mismatch">Passwords do not match</string>
+    <string name="error_invalid_credentials">Invalid username or password</string>
+    <string name="error_user_exists">Username already exists. Please choose another.</string>
+    <string name="registration_success">Registration successful!</string>
+    <string name="login_success">Login successful!</string>
+    <string name="logout">Log Out</string>
 </resources>
