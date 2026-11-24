@@ -7,7 +7,10 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class DatabaseHelper extends SQLiteOpenHelper {
 
@@ -112,9 +115,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     /**
      * Registers a new user and pre-populates default workout templates.
-     * @param username user name
-     * @param password user password
-     * @return newly generated user ID, or -1 if registration failed or user already exists
      */
     public long registerUser(String username, String password) {
         if (checkUserExists(username)) {
@@ -217,7 +217,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     /**
      * Authenticates user credentials.
-     * @return user ID if authenticated successfully, or -1 otherwise.
      */
     public long authenticateUser(String username, String password) {
         SQLiteDatabase db = this.getReadableDatabase();
@@ -240,7 +239,42 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
-     * Get all workouts for a specific user.
+     * Creates a new custom workout routine with the specified exercises.
+     */
+    public long createCustomWorkout(long userId, String workoutName, List<Exercise> exercises) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        long workoutId = -1;
+        try {
+            workoutId = insertWorkoutInternal(db, userId, workoutName);
+            if (workoutId != -1 && exercises != null) {
+                for (Exercise exercise : exercises) {
+                    insertExerciseInternal(db, workoutId,
+                            exercise.getExerciseName(),
+                            exercise.getSets(),
+                            exercise.getReps(),
+                            exercise.getWeight());
+                }
+            }
+            db.setTransactionSuccessful();
+        } catch (Exception e) {
+            workoutId = -1;
+        } finally {
+            db.endTransaction();
+        }
+        return workoutId;
+    }
+
+    /**
+     * Adds an exercise to an existing workout.
+     */
+    public long addExerciseToWorkout(long workoutId, String exerciseName, int sets, int reps, double weight) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        return insertExerciseInternal(db, workoutId, exerciseName, sets, reps, weight);
+    }
+
+    /**
+     * Get all workouts for a specific user as a Cursor.
      */
     public Cursor getUserWorkouts(long userId) {
         SQLiteDatabase db = this.getReadableDatabase();
@@ -252,7 +286,63 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
-     * Get all exercises for a given workout.
+     * Get all workouts for a specific user as a typed List of Workout objects,
+     * with each workout's exercises loaded.
+     */
+    public List<Workout> getUserWorkoutList(long userId) {
+        List<Workout> workouts = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_WORKOUTS,
+                null,
+                COLUMN_WORKOUT_USER_ID + " = ?",
+                new String[]{String.valueOf(userId)},
+                null, null, COLUMN_WORKOUT_ID + " ASC");
+
+        if (cursor != null) {
+            try {
+                while (cursor.moveToNext()) {
+                    long workoutId = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_WORKOUT_ID));
+                    String workoutName = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_WORKOUT_NAME));
+                    Workout workout = new Workout(workoutId, userId, workoutName);
+                    workout.setExercises(getExercisesForWorkout(workoutId));
+                    workouts.add(workout);
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+        return workouts;
+    }
+
+    /**
+     * Get a single workout by its ID, with its exercises loaded.
+     */
+    public Workout getWorkoutById(long workoutId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_WORKOUTS,
+                null,
+                COLUMN_WORKOUT_ID + " = ?",
+                new String[]{String.valueOf(workoutId)},
+                null, null, null);
+
+        Workout workout = null;
+        if (cursor != null) {
+            try {
+                if (cursor.moveToFirst()) {
+                    long userId = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_WORKOUT_USER_ID));
+                    String workoutName = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_WORKOUT_NAME));
+                    workout = new Workout(workoutId, userId, workoutName);
+                    workout.setExercises(getExercisesForWorkout(workoutId));
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+        return workout;
+    }
+
+    /**
+     * Get all exercises for a given workout as a Cursor.
      */
     public Cursor getWorkoutExercises(long workoutId) {
         SQLiteDatabase db = this.getReadableDatabase();
@@ -261,6 +351,36 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 COLUMN_EXERCISE_WORKOUT_ID + " = ?",
                 new String[]{String.valueOf(workoutId)},
                 null, null, COLUMN_EXERCISE_ID + " ASC");
+    }
+
+    /**
+     * Get all exercises for a given workout as a typed List.
+     */
+    public List<Exercise> getExercisesForWorkout(long workoutId) {
+        List<Exercise> exercises = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_WORKOUT_EXERCISES,
+                null,
+                COLUMN_EXERCISE_WORKOUT_ID + " = ?",
+                new String[]{String.valueOf(workoutId)},
+                null, null, COLUMN_EXERCISE_ID + " ASC");
+
+        if (cursor != null) {
+            try {
+                while (cursor.moveToNext()) {
+                    long id = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_EXERCISE_ID));
+                    String exerciseName = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_EXERCISE_NAME));
+                    int sets = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_EXERCISE_SETS));
+                    int reps = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_EXERCISE_REPS));
+                    double weight = cursor.getDouble(cursor.getColumnIndexOrThrow(COLUMN_EXERCISE_WEIGHT));
+
+                    exercises.add(new Exercise(id, workoutId, exerciseName, sets, reps, weight));
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+        return exercises;
     }
 
     /**
@@ -279,7 +399,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
-     * Get workout history for a specific user.
+     * Get workout history for a specific user as a Cursor.
      */
     public Cursor getUserWorkoutHistory(long userId) {
         SQLiteDatabase db = this.getReadableDatabase();
@@ -287,6 +407,58 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 null,
                 COLUMN_HISTORY_USER_ID + " = ?",
                 new String[]{String.valueOf(userId)},
-                null, null, COLUMN_HISTORY_DATE + " DESC");
+                null, null, COLUMN_HISTORY_DATE + " DESC, " + COLUMN_HISTORY_ID + " DESC");
+    }
+
+    /**
+     * Get user workout history with personal progress comparison against previous sessions.
+     * Chronologically calculates progress per exercise, then returns the list sorted descending.
+     */
+    public List<WorkoutHistoryItem> getUserWorkoutHistoryWithProgress(long userId) {
+        List<WorkoutHistoryItem> chronologicalList = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        // Query history in chronological order (ASC) so we can track progression across time
+        Cursor cursor = db.query(TABLE_WORKOUT_HISTORY,
+                null,
+                COLUMN_HISTORY_USER_ID + " = ?",
+                new String[]{String.valueOf(userId)},
+                null, null, COLUMN_HISTORY_DATE + " ASC, " + COLUMN_HISTORY_ID + " ASC");
+
+        if (cursor != null) {
+            try {
+                while (cursor.moveToNext()) {
+                    long id = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_HISTORY_ID));
+                    String workoutName = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_HISTORY_WORKOUT_NAME));
+                    String exerciseName = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_HISTORY_EXERCISE_NAME));
+                    int setsDone = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_HISTORY_SETS_DONE));
+                    double weightUsed = cursor.getDouble(cursor.getColumnIndexOrThrow(COLUMN_HISTORY_WEIGHT_USED));
+                    String date = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_HISTORY_DATE));
+
+                    chronologicalList.add(new WorkoutHistoryItem(id, userId, workoutName, exerciseName, setsDone, weightUsed, date));
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+
+        // Compare each exercise to its preceding session
+        Map<String, WorkoutHistoryItem> lastExerciseSessionMap = new HashMap<>();
+        for (WorkoutHistoryItem item : chronologicalList) {
+            String key = item.getExerciseName().trim().toLowerCase();
+            if (lastExerciseSessionMap.containsKey(key)) {
+                WorkoutHistoryItem previousSession = lastExerciseSessionMap.get(key);
+                if (previousSession != null) {
+                    item.setHasPrevious(true);
+                    item.setPreviousWeight(previousSession.getWeightUsed());
+                    item.setPreviousSets(previousSession.getSetsDone());
+                }
+            }
+            lastExerciseSessionMap.put(key, item);
+        }
+
+        // Reverse to display newest sessions first
+        Collections.reverse(chronologicalList);
+        return chronologicalList;
     }
 }

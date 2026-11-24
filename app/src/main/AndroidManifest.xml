@@ -35,6 +35,17 @@
             android:name=".MainActivity"
             android:exported="false" />
 
+        <!-- ActiveWorkoutActivity for in-progress workout sessions -->
+        <activity
+            android:name=".ActiveWorkoutActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- HistoryActivity for past workouts and personal progress -->
+        <activity
+            android:name=".HistoryActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>
