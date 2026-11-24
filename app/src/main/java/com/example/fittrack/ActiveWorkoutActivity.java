@@ -77,6 +77,7 @@ public class ActiveWorkoutActivity extends AppCompatActivity implements ActiveEx
         setContentView(R.layout.activity_active_workout);
 
         databaseHelper = new DatabaseHelper(this);
+        ExerciseImageHelper.getInstance().prefetchExercises(this);
 
         workoutId = getIntent().getLongExtra(MainActivity.EXTRA_WORKOUT_ID, -1);
         workoutName = getIntent().getStringExtra(MainActivity.EXTRA_WORKOUT_NAME);

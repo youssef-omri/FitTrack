@@ -2,14 +2,17 @@ package com.example.fittrack;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -76,6 +79,7 @@ public class MainActivity extends AppCompatActivity implements WorkoutAdapter.On
         setContentView(R.layout.activity_main);
 
         databaseHelper = new DatabaseHelper(this);
+        ExerciseImageHelper.getInstance().prefetchExercises(this);
 
         tvWelcomeUser = findViewById(R.id.tvWelcomeUser);
         btnLogout = findViewById(R.id.btnLogout);
@@ -171,6 +175,7 @@ public class MainActivity extends AppCompatActivity implements WorkoutAdapter.On
         }
 
         final EditText etRoutineName = dialogView.findViewById(R.id.etRoutineName);
+        final ImageView ivSelectedExerciseThumb = dialogView.findViewById(R.id.ivSelectedExerciseThumb);
         final AutoCompleteTextView actvExerciseName = dialogView.findViewById(R.id.actvExerciseName);
         final EditText etExerciseSets = dialogView.findViewById(R.id.etExerciseSets);
         final EditText etExerciseReps = dialogView.findViewById(R.id.etExerciseReps);
@@ -181,13 +186,36 @@ public class MainActivity extends AppCompatActivity implements WorkoutAdapter.On
         final Button btnCancelRoutine = dialogView.findViewById(R.id.btnCancelRoutine);
         final Button btnSaveRoutine = dialogView.findViewById(R.id.btnSaveRoutine);
 
-        // Pre-fill AutoComplete with built-in exercises
-        ArrayAdapter<String> exerciseAdapter = new ArrayAdapter<>(
+        // Pre-fill AutoComplete with built-in exercises and demonstration thumbnails
+        ExerciseDropdownAdapter exerciseAdapter = new ExerciseDropdownAdapter(
                 this,
-                android.R.layout.simple_dropdown_item_1line,
                 BUILT_IN_EXERCISES
         );
         actvExerciseName.setAdapter(exerciseAdapter);
+        ExerciseImageHelper.getInstance().loadExerciseImage(this, "", ivSelectedExerciseThumb);
+
+        actvExerciseName.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Object item = parent.getItemAtPosition(position);
+                String selected = item != null ? item.toString() : "";
+                ExerciseImageHelper.getInstance().loadExerciseImage(MainActivity.this, selected, ivSelectedExerciseThumb);
+            }
+        });
+
+        actvExerciseName.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                String typed = s != null ? s.toString().trim() : "";
+                ExerciseImageHelper.getInstance().loadExerciseImage(MainActivity.this, typed, ivSelectedExerciseThumb);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
 
         final List<Exercise> pendingExercises = new ArrayList<>();
 
@@ -310,10 +338,12 @@ public class MainActivity extends AppCompatActivity implements WorkoutAdapter.On
         emptyView.setVisibility(View.GONE);
 
         final View chipView = LayoutInflater.from(this).inflate(R.layout.item_added_exercise_chip, container, false);
+        ImageView ivThumb = chipView.findViewById(R.id.ivAddedExerciseThumb);
         TextView tvName = chipView.findViewById(R.id.tvAddedExerciseName);
         TextView tvDetails = chipView.findViewById(R.id.tvAddedExerciseDetails);
         ImageButton btnRemove = chipView.findViewById(R.id.btnRemoveAddedExercise);
 
+        ExerciseImageHelper.getInstance().loadExerciseImage(this, exercise.getExerciseName(), ivThumb);
         tvName.setText(exercise.getExerciseName());
         String weightText = exercise.getWeight() > 0 ? " @ " + exercise.getWeight() + " kg" : "";
         tvDetails.setText(exercise.getSets() + " sets × " + exercise.getReps() + " reps" + weightText);

@@ -11,24 +11,44 @@
     android:paddingEnd="8dp"
     android:paddingBottom="8dp">
 
-    <TextView
-        android:id="@+id/tvAddedExerciseName"
+    <ImageView
+        android:id="@+id/ivAddedExerciseThumb"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_exercise_thumb"
+        android:clipToOutline="true"
+        android:contentDescription="Exercise thumbnail"
+        android:padding="4dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_fitness_center" />
+
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="Bench Press"
-        android:textColor="@color/text_primary"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/tvAddedExerciseDetails"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
         android:layout_marginEnd="8dp"
-        android:text="3 sets × 10 reps @ 60kg"
-        android:textColor="@color/text_secondary"
-        android:textSize="12sp" />
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvAddedExerciseName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Bench Press"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvAddedExerciseDetails"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="3 sets × 10 reps @ 60kg"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+    </LinearLayout>
 
     <ImageButton
         android:id="@+id/btnRemoveAddedExercise"

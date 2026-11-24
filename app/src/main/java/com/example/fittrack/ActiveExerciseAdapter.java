@@ -9,6 +9,7 @@ import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -52,6 +53,7 @@ public class ActiveExerciseAdapter extends RecyclerView.Adapter<ActiveExerciseAd
 
     class ActiveExerciseViewHolder extends RecyclerView.ViewHolder {
         private final CheckBox cbExerciseDone;
+        private final ImageView ivActiveExerciseThumb;
         private final TextView tvActiveExerciseName;
         private final TextView tvTargetInfo;
         private final TextView tvDoneBadge;
@@ -66,6 +68,7 @@ public class ActiveExerciseAdapter extends RecyclerView.Adapter<ActiveExerciseAd
             super(itemView);
             llActiveExerciseCard = itemView.findViewById(R.id.llActiveExerciseCard);
             cbExerciseDone = itemView.findViewById(R.id.cbExerciseDone);
+            ivActiveExerciseThumb = itemView.findViewById(R.id.ivActiveExerciseThumb);
             tvActiveExerciseName = itemView.findViewById(R.id.tvActiveExerciseName);
             tvTargetInfo = itemView.findViewById(R.id.tvTargetInfo);
             tvDoneBadge = itemView.findViewById(R.id.tvDoneBadge);
@@ -84,6 +87,7 @@ public class ActiveExerciseAdapter extends RecyclerView.Adapter<ActiveExerciseAd
             cbExerciseDone.setOnCheckedChangeListener(null);
 
             tvActiveExerciseName.setText(exercise.getExerciseName());
+            ExerciseImageHelper.getInstance().loadExerciseImage(context, exercise.getExerciseName(), ivActiveExerciseThumb);
 
             String weightStr = exercise.getWeight() > 0 ? " @ " + exercise.getWeight() + " kg" : " (Bodyweight)";
             String targetDesc = "Target: " + exercise.getSets() + " sets × " + exercise.getReps() + " reps" + weightStr;
