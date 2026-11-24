@@ -30,6 +30,9 @@
     <string name="add_exercise_to_routine">Add Exercise to Routine</string>
     <string name="workout_duration_label">WORKOUT DURATION</string>
     <string name="edit_routine">Edit routine</string>
+    <string name="delete_routine">Delete routine</string>
+    <string name="delete_history_entry">Delete history entry</string>
+    <string name="clear_all">Clear All</string>
     <string name="pause_stopwatch">Pause</string>
     <string name="resume_stopwatch">Resume</string>
     <string name="stopwatch_running">Recording session</string>

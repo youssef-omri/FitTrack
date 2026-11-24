@@ -5,6 +5,7 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -22,12 +23,18 @@ import java.util.Set;
 
 public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.HistoryGroupViewHolder> {
 
+    public interface OnHistoryItemDeleteListener {
+        void onDeleteHistoryItem(WorkoutHistoryItem item);
+    }
+
     private final Context context;
     private final List<HistoryDateGroup> dateGroups;
+    private final OnHistoryItemDeleteListener deleteListener;
 
-    public HistoryAdapter(Context context, List<HistoryDateGroup> dateGroups) {
+    public HistoryAdapter(Context context, List<HistoryDateGroup> dateGroups, OnHistoryItemDeleteListener deleteListener) {
         this.context = context;
         this.dateGroups = dateGroups;
+        this.deleteListener = deleteListener;
     }
 
     @NonNull
@@ -85,7 +92,7 @@ public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.HistoryG
 
             llDateExercisesContainer.removeAllViews();
             for (int i = 0; i < items.size(); i++) {
-                WorkoutHistoryItem item = items.get(i);
+                final WorkoutHistoryItem item = items.get(i);
                 View exerciseView = LayoutInflater.from(context).inflate(R.layout.item_history_exercise, llDateExercisesContainer, false);
 
                 TextView tvName = exerciseView.findViewById(R.id.tvHistoryExerciseName);
@@ -93,7 +100,17 @@ public class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.HistoryG
                 TextView tvProgressBadge = exerciseView.findViewById(R.id.tvHistoryProgressBadge);
                 TextView tvPerformance = exerciseView.findViewById(R.id.tvHistoryPerformance);
                 TextView tvComparisonNote = exerciseView.findViewById(R.id.tvHistoryComparisonNote);
+                ImageButton btnDeleteHistoryItem = exerciseView.findViewById(R.id.btnDeleteHistoryItem);
                 View divider = exerciseView.findViewById(R.id.vHistoryDivider);
+
+                btnDeleteHistoryItem.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if (deleteListener != null) {
+                            deleteListener.onDeleteHistoryItem(item);
+                        }
+                    }
+                });
 
                 // Hide bottom divider for last item in date card
                 if (i == items.size() - 1) {

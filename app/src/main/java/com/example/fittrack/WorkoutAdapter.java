@@ -22,6 +22,7 @@ public class WorkoutAdapter extends RecyclerView.Adapter<WorkoutAdapter.WorkoutV
     public interface OnWorkoutClickListener {
         void onWorkoutClick(Workout workout);
         void onEditWorkoutClick(Workout workout);
+        void onDeleteWorkoutClick(Workout workout);
     }
 
     private final Context context;
@@ -64,6 +65,7 @@ public class WorkoutAdapter extends RecyclerView.Adapter<WorkoutAdapter.WorkoutV
         private final TextView tvWorkoutTitle;
         private final TextView tvExerciseCountBadge;
         private final ImageButton btnEditWorkout;
+        private final ImageButton btnDeleteWorkout;
         private final LinearLayout llExercisePreviewList;
         private final Button btnStartWorkout;
 
@@ -72,6 +74,7 @@ public class WorkoutAdapter extends RecyclerView.Adapter<WorkoutAdapter.WorkoutV
             tvWorkoutTitle = itemView.findViewById(R.id.tvWorkoutTitle);
             tvExerciseCountBadge = itemView.findViewById(R.id.tvExerciseCountBadge);
             btnEditWorkout = itemView.findViewById(R.id.btnEditWorkout);
+            btnDeleteWorkout = itemView.findViewById(R.id.btnDeleteWorkout);
             llExercisePreviewList = itemView.findViewById(R.id.llExercisePreviewList);
             btnStartWorkout = itemView.findViewById(R.id.btnStartWorkout);
         }
@@ -121,6 +124,15 @@ public class WorkoutAdapter extends RecyclerView.Adapter<WorkoutAdapter.WorkoutV
                 public void onClick(View v) {
                     if (listener != null) {
                         listener.onEditWorkoutClick(workout);
+                    }
+                }
+            });
+
+            btnDeleteWorkout.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (listener != null) {
+                        listener.onDeleteWorkoutClick(workout);
                     }
                 }
             });

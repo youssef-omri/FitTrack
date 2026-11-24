@@ -23,10 +23,13 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,21 +37,32 @@ import java.util.concurrent.Executors;
 /**
  * Helper class that fetches exercise demonstration image URLs from the Wger REST API
  * on a background thread, caches name-to-URL mappings, and loads thumbnails via Glide
- * with a built-in fitness vector icon fallback.
+ * with smart keyword/synonym matching and a built-in fitness vector icon fallback.
  */
 public class ExerciseImageHelper {
 
     private static final String TAG = "ExerciseImageHelper";
     private static final String WGER_BASE_URL = "https://wger.de";
-    private static final String WGER_API_URL = "https://wger.de/api/v2/exerciseinfo/?language=2&limit=50";
-    private static final int CONNECT_TIMEOUT_MS = 8000;
-    private static final int READ_TIMEOUT_MS = 8000;
+    private static final String WGER_EXERCISE_INFO_URL = "https://wger.de/api/v2/exerciseinfo/?language=2&limit=200";
+    private static final String WGER_EXERCISE_IMAGE_URL = "https://wger.de/api/v2/exerciseimage/?format=json&limit=200";
+    private static final int CONNECT_TIMEOUT_MS = 10000;
+    private static final int READ_TIMEOUT_MS = 10000;
     private static final long RETRY_COOLDOWN_MS = 30000L;
     private static final int CORNER_RADIUS_DP = 8;
+
+    private static final Set<String> NOISE_TOKENS = new HashSet<>(Arrays.asList(
+            "flat", "conventional", "alternating", "single", "arm", "standing", "seated",
+            "lying", "donkey", "walking", "hanging", "bulgarian", "russian", "ez", "bar",
+            "barbell", "dumbbell", "cable", "rope", "machine", "smith", "band", "stiff",
+            "legged", "with", "and", "the", "on", "to", "of", "in"
+    ));
+
+    private static final List<KeywordRule> KEYWORD_RULES = buildKeywordRules();
 
     private static volatile ExerciseImageHelper instance;
 
     private final Map<String, String> exerciseImageCache = new ConcurrentHashMap<>();
+    private final Map<String, CachedEntry> searchableEntries = new ConcurrentHashMap<>();
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final List<PendingImageLoad> pendingLoads = new ArrayList<>();
@@ -57,17 +71,54 @@ public class ExerciseImageHelper {
     private volatile boolean hasFetchedSuccess = false;
     private volatile long lastFetchAttemptMs = 0L;
 
+    private static class CachedEntry {
+        final String normalizedName;
+        final String imageUrl;
+        final boolean isMain;
+
+        CachedEntry(String normalizedName, String imageUrl, boolean isMain) {
+            this.normalizedName = normalizedName;
+            this.imageUrl = imageUrl;
+            this.isMain = isMain;
+        }
+    }
+
     private static class PendingImageLoad {
         final WeakReference<Context> contextRef;
         final WeakReference<ImageView> imageViewRef;
-        final String exerciseName;
         final String normalizedKey;
 
-        PendingImageLoad(Context context, ImageView imageView, String exerciseName, String normalizedKey) {
+        PendingImageLoad(Context context, ImageView imageView, String normalizedKey) {
             this.contextRef = new WeakReference<>(context);
             this.imageViewRef = new WeakReference<>(imageView);
-            this.exerciseName = exerciseName;
             this.normalizedKey = normalizedKey;
+        }
+    }
+
+    private static class KeywordRule {
+        final String[] requiredAny;
+        final String[] requiredAlsoAny;
+        final String[] excludedAny;
+        final String[] targetPhrases;
+
+        KeywordRule(String[] requiredAny, String[] requiredAlsoAny, String[] excludedAny, String[] targetPhrases) {
+            this.requiredAny = requiredAny;
+            this.requiredAlsoAny = requiredAlsoAny;
+            this.excludedAny = excludedAny;
+            this.targetPhrases = targetPhrases;
+        }
+
+        boolean matches(String query) {
+            if (requiredAny != null && !containsAnyTerm(query, requiredAny)) {
+                return false;
+            }
+            if (requiredAlsoAny != null && !containsAnyTerm(query, requiredAlsoAny)) {
+                return false;
+            }
+            if (excludedAny != null && containsAnyTerm(query, excludedAny)) {
+                return false;
+            }
+            return true;
         }
     }
 
@@ -118,12 +169,10 @@ public class ExerciseImageHelper {
             return;
         }
 
-        // Show clean vector icon while loading or if unmatched
         showFallback(context, imageView);
 
-        // If we haven't successfully fetched yet, fetch on a background thread and update when ready
         if (!hasFetchedSuccess) {
-            ensureDataLoaded(new PendingImageLoad(context, imageView, exerciseName, normalizedKey));
+            ensureDataLoaded(new PendingImageLoad(context, imageView, normalizedKey));
         }
     }
 
@@ -153,38 +202,30 @@ public class ExerciseImageHelper {
     }
 
     private void fetchAndCacheFromWger() {
-        HttpURLConnection connection = null;
         boolean success = false;
+        Map<Integer, List<String>> exerciseIdToNames = new HashMap<>();
 
         try {
-            URL url = new URL(WGER_API_URL);
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            connection.setReadTimeout(READ_TIMEOUT_MS);
-            connection.setRequestProperty("Accept", "application/json");
+            String infoJson = fetchUrl(WGER_EXERCISE_INFO_URL);
+            if (!TextUtils.isEmpty(infoJson)) {
+                parseExerciseInfoResponse(infoJson, exerciseIdToNames);
+            }
 
-            int responseCode = connection.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                StringBuilder responseBuilder = new StringBuilder();
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        responseBuilder.append(line);
+            String imageJson = fetchUrl(WGER_EXERCISE_IMAGE_URL);
+            if (!TextUtils.isEmpty(imageJson)) {
+                String nextUrl = parseExerciseImageResponse(imageJson, exerciseIdToNames);
+                // Fetch one additional page of images if paginated so almost all Wger images are cached
+                if (!TextUtils.isEmpty(nextUrl)) {
+                    String nextImageJson = fetchUrl(nextUrl);
+                    if (!TextUtils.isEmpty(nextImageJson)) {
+                        parseExerciseImageResponse(nextImageJson, exerciseIdToNames);
                     }
                 }
-                parseAndCacheResponse(responseBuilder.toString());
-                success = true;
-            } else {
-                Log.w(TAG, "Wger API returned HTTP " + responseCode);
             }
+
+            success = !exerciseImageCache.isEmpty();
         } catch (Exception e) {
-            Log.w(TAG, "Failed to fetch exercise images from Wger API (offline or unreachable): " + e.getMessage());
-        } finally {
-            if (connection != null) {
-                connection.disconnect();
-            }
+            Log.w(TAG, "Failed to fetch exercise images from Wger API: " + e.getMessage());
         }
 
         hasFetchedSuccess = success;
@@ -219,10 +260,42 @@ public class ExerciseImageHelper {
         }
     }
 
-    private void parseAndCacheResponse(String jsonString) {
-        if (TextUtils.isEmpty(jsonString)) {
-            return;
+    private String fetchUrl(String urlString) {
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(urlString);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("User-Agent", "FitTrack-Android/1.0");
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                StringBuilder responseBuilder = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        responseBuilder.append(line);
+                    }
+                }
+                return responseBuilder.toString();
+            } else {
+                Log.w(TAG, "Wger API returned HTTP " + responseCode + " for " + urlString);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error fetching " + urlString + ": " + e.getMessage());
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
         }
+        return null;
+    }
+
+    private void parseExerciseInfoResponse(String jsonString, Map<Integer, List<String>> exerciseIdToNames) {
         try {
             JSONObject root = new JSONObject(jsonString);
             JSONArray results = root.optJSONArray("results");
@@ -236,44 +309,124 @@ public class ExerciseImageHelper {
                     continue;
                 }
 
-                String imageUrl = extractBestImageUrl(exerciseObj.optJSONArray("images"));
-                if (TextUtils.isEmpty(imageUrl)) {
+                List<String> names = extractExerciseNames(exerciseObj);
+                if (names.isEmpty()) {
                     continue;
                 }
 
-                List<String> names = extractExerciseNames(exerciseObj);
-                for (String name : names) {
-                    cacheNameMapping(name, imageUrl);
+                int id = exerciseObj.optInt("id", -1);
+                if (id > 0) {
+                    exerciseIdToNames.put(id, names);
+                }
+                int baseId = exerciseObj.optInt("exercise_base", -1);
+                if (baseId > 0) {
+                    exerciseIdToNames.put(baseId, names);
+                }
+
+                JSONArray images = exerciseObj.optJSONArray("images");
+                if (images != null) {
+                    for (int j = 0; j < images.length(); j++) {
+                        JSONObject imgObj = images.optJSONObject(j);
+                        if (imgObj == null) {
+                            continue;
+                        }
+                        String rawUrl = imgObj.optString("image", "").trim();
+                        if (TextUtils.isEmpty(rawUrl)) {
+                            continue;
+                        }
+                        String fullUrl = rawUrl.startsWith("/") ? WGER_BASE_URL + rawUrl : rawUrl;
+                        boolean isMain = imgObj.optBoolean("is_main", false);
+                        for (String name : names) {
+                            cacheNameMapping(name, fullUrl, isMain);
+                        }
+                    }
                 }
             }
         } catch (Exception e) {
-            Log.w(TAG, "Error parsing Wger JSON response: " + e.getMessage());
+            Log.w(TAG, "Error parsing Wger exerciseinfo JSON: " + e.getMessage());
         }
     }
 
-    private String extractBestImageUrl(JSONArray images) {
-        if (images == null || images.length() == 0) {
+    private String parseExerciseImageResponse(String jsonString, Map<Integer, List<String>> exerciseIdToNames) {
+        try {
+            JSONObject root = new JSONObject(jsonString);
+            JSONArray results = root.optJSONArray("results");
+            if (results == null) {
+                return null;
+            }
+
+            for (int i = 0; i < results.length(); i++) {
+                JSONObject imgObj = results.optJSONObject(i);
+                if (imgObj == null) {
+                    continue;
+                }
+
+                String rawUrl = imgObj.optString("image", "").trim();
+                if (TextUtils.isEmpty(rawUrl)) {
+                    continue;
+                }
+                String fullUrl = rawUrl.startsWith("/") ? WGER_BASE_URL + rawUrl : rawUrl;
+                boolean isMain = imgObj.optBoolean("is_main", false);
+
+                int exerciseBaseId = imgObj.optInt("exercise_base", -1);
+                int exerciseId = imgObj.optInt("exercise", -1);
+
+                List<String> linkedNames = exerciseIdToNames.get(exerciseBaseId);
+                if (linkedNames == null || linkedNames.isEmpty()) {
+                    linkedNames = exerciseIdToNames.get(exerciseId);
+                }
+                if (linkedNames != null) {
+                    for (String name : linkedNames) {
+                        cacheNameMapping(name, fullUrl, isMain);
+                    }
+                }
+
+                // Also index descriptive Wger filenames (e.g. "Bench-press-1.png" -> "bench press")
+                String fileDerivedName = extractNameFromImageUrl(fullUrl);
+                if (!TextUtils.isEmpty(fileDerivedName)) {
+                    cacheNameMapping(fileDerivedName, fullUrl, isMain);
+                }
+            }
+
+            String next = root.optString("next", "").trim();
+            if (!TextUtils.isEmpty(next) && !"null".equalsIgnoreCase(next)) {
+                return next.startsWith("/") ? WGER_BASE_URL + next : next;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error parsing Wger exerciseimage JSON: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private String extractNameFromImageUrl(String imageUrl) {
+        if (TextUtils.isEmpty(imageUrl)) {
             return null;
         }
-        String fallbackUrl = null;
-        for (int i = 0; i < images.length(); i++) {
-            JSONObject imgObj = images.optJSONObject(i);
-            if (imgObj == null) {
-                continue;
-            }
-            String rawUrl = imgObj.optString("image", "").trim();
-            if (TextUtils.isEmpty(rawUrl)) {
-                continue;
-            }
-            String fullUrl = rawUrl.startsWith("/") ? WGER_BASE_URL + rawUrl : rawUrl;
-            if (imgObj.optBoolean("is_main", false)) {
-                return fullUrl;
-            }
-            if (fallbackUrl == null) {
-                fallbackUrl = fullUrl;
-            }
+        int lastSlash = imageUrl.lastIndexOf('/');
+        String filename = lastSlash >= 0 ? imageUrl.substring(lastSlash + 1) : imageUrl;
+        int queryIdx = filename.indexOf('?');
+        if (queryIdx >= 0) {
+            filename = filename.substring(0, queryIdx);
         }
-        return fallbackUrl;
+        int dotIdx = filename.lastIndexOf('.');
+        if (dotIdx > 0) {
+            filename = filename.substring(0, dotIdx);
+        }
+        // Strip trailing sequence numbers like "-1", "-2", "_01"
+        filename = filename.replaceAll("[-_]+\\d+$", "");
+        String normalized = normalizeName(filename);
+        if (normalized.length() < 3 || normalized.matches("^[0-9\\s]+$")) {
+            return null;
+        }
+        // Ignore UUID / hex-hash filenames
+        if (!normalized.contains(" ") && normalized.length() >= 16 && normalized.matches("^[0-9a-f]+$")) {
+            return null;
+        }
+        // Ignore random hash-like single tokens with no spaces and digits mixed in
+        if (!normalized.contains(" ") && normalized.matches(".*\\d.*") && normalized.length() > 10) {
+            return null;
+        }
+        return normalized;
     }
 
     private List<String> extractExerciseNames(JSONObject exerciseObj) {
@@ -320,16 +473,20 @@ public class ExerciseImageHelper {
         return -1;
     }
 
-    private void cacheNameMapping(String rawName, String imageUrl) {
+    private void cacheNameMapping(String rawName, String imageUrl, boolean isMain) {
         String normalized = normalizeName(rawName);
-        if (TextUtils.isEmpty(normalized)) {
+        if (TextUtils.isEmpty(normalized) || TextUtils.isEmpty(imageUrl)) {
             return;
         }
-        exerciseImageCache.putIfAbsent(normalized, imageUrl);
 
-        String compact = normalized.replace(" ", "");
-        if (!TextUtils.isEmpty(compact)) {
-            exerciseImageCache.putIfAbsent(compact, imageUrl);
+        CachedEntry existing = searchableEntries.get(normalized);
+        if (existing == null || (isMain && !existing.isMain)) {
+            searchableEntries.put(normalized, new CachedEntry(normalized, imageUrl, isMain));
+            exerciseImageCache.put(normalized, imageUrl);
+            String compact = normalized.replace(" ", "");
+            if (!TextUtils.isEmpty(compact)) {
+                exerciseImageCache.put(compact, imageUrl);
+            }
         }
     }
 
@@ -338,22 +495,59 @@ public class ExerciseImageHelper {
             return null;
         }
 
-        // 1. Exact normalized match
-        String url = exerciseImageCache.get(normalizedQuery);
+        // 1. Exact, compact, and singular/plural lookup
+        String url = lookupExactOrPlural(normalizedQuery);
         if (url != null) {
             return url;
         }
 
-        // 2. Compact match (handles "pull ups" vs "pullups", "push ups" vs "pushups")
-        String compactQuery = normalizedQuery.replace(" ", "");
-        url = exerciseImageCache.get(compactQuery);
+        // 2. All-token match on full query
+        url = matchAllTokensInEntries(normalizedQuery.split(" "));
         if (url != null) {
             return url;
         }
 
-        // 3. Singular / plural variants (e.g. "squats" <-> "squat", "lunges" <-> "lunge")
-        if (normalizedQuery.endsWith("s") && normalizedQuery.length() > 3) {
-            String singular = normalizedQuery.substring(0, normalizedQuery.length() - 1);
+        // 3. Core-name match after stripping equipment/position modifiers (e.g. "Flat Barbell Bench Press" -> "bench press")
+        String coreQuery = stripNoiseTokens(normalizedQuery);
+        if (!TextUtils.isEmpty(coreQuery) && !coreQuery.equals(normalizedQuery)) {
+            url = lookupExactOrPlural(coreQuery);
+            if (url != null) {
+                return url;
+            }
+            url = matchAllTokensInEntries(coreQuery.split(" "));
+            if (url != null) {
+                return url;
+            }
+        }
+
+        // 4. Smart keyword & synonym rule matching
+        for (KeywordRule rule : KEYWORD_RULES) {
+            if (rule.matches(normalizedQuery)) {
+                for (String targetPhrase : rule.targetPhrases) {
+                    String matched = matchPhrase(targetPhrase);
+                    if (matched != null) {
+                        return matched;
+                    }
+                }
+            }
+        }
+
+        // 5. Scored token overlap fallback across all cached Wger entries
+        return findBestTokenOverlapMatch(normalizedQuery);
+    }
+
+    private String lookupExactOrPlural(String query) {
+        String url = exerciseImageCache.get(query);
+        if (url != null) {
+            return url;
+        }
+        String compact = query.replace(" ", "");
+        url = exerciseImageCache.get(compact);
+        if (url != null) {
+            return url;
+        }
+        if (query.endsWith("s") && query.length() > 3) {
+            String singular = query.substring(0, query.length() - 1);
             url = exerciseImageCache.get(singular);
             if (url != null) {
                 return url;
@@ -363,36 +557,96 @@ public class ExerciseImageHelper {
                 return url;
             }
         } else {
-            String plural = normalizedQuery + "s";
+            String plural = query + "s";
             url = exerciseImageCache.get(plural);
             if (url != null) {
                 return url;
             }
         }
+        return null;
+    }
 
-        // 4. Token-based match against cached Wger exercise names (e.g. "bench press" -> "barbell bench press")
-        String[] queryTokens = normalizedQuery.split(" ");
-        if (queryTokens.length == 0) {
+    private String matchPhrase(String phrase) {
+        String normalizedPhrase = normalizeName(phrase);
+        String url = lookupExactOrPlural(normalizedPhrase);
+        if (url != null) {
+            return url;
+        }
+        return matchAllTokensInEntries(normalizedPhrase.split(" "));
+    }
+
+    private String matchAllTokensInEntries(String[] queryTokens) {
+        if (queryTokens == null || queryTokens.length == 0) {
             return null;
         }
 
-        String bestMatchUrl = null;
-        int bestKeyLength = Integer.MAX_VALUE;
-        Iterator<Map.Entry<String, String>> iterator = exerciseImageCache.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<String, String> entry = iterator.next();
-            String candidateKey = entry.getKey();
-            if (!candidateKey.contains(" ") && queryTokens.length > 1) {
+        CachedEntry bestEntry = null;
+        for (CachedEntry entry : searchableEntries.values()) {
+            if (!entry.normalizedName.contains(" ") && queryTokens.length > 1) {
                 continue;
             }
-            if (containsAllTokens(candidateKey, queryTokens)) {
-                if (candidateKey.length() < bestKeyLength) {
-                    bestKeyLength = candidateKey.length();
-                    bestMatchUrl = entry.getValue();
+            if (containsAllTokens(entry.normalizedName, queryTokens)) {
+                if (bestEntry == null) {
+                    bestEntry = entry;
+                } else if (entry.isMain != bestEntry.isMain) {
+                    if (entry.isMain) {
+                        bestEntry = entry;
+                    }
+                } else if (entry.normalizedName.length() < bestEntry.normalizedName.length()) {
+                    bestEntry = entry;
                 }
             }
         }
-        return bestMatchUrl;
+        return bestEntry != null ? bestEntry.imageUrl : null;
+    }
+
+    private String findBestTokenOverlapMatch(String normalizedQuery) {
+        String[] tokens = normalizedQuery.split(" ");
+        List<String> significantTokens = new ArrayList<>();
+        for (String token : tokens) {
+            if (token.length() >= 3 && !NOISE_TOKENS.contains(token)) {
+                significantTokens.add(singularizeToken(token));
+            }
+        }
+        if (significantTokens.isEmpty()) {
+            return null;
+        }
+
+        CachedEntry bestEntry = null;
+        int bestScore = 0;
+
+        for (CachedEntry entry : searchableEntries.values()) {
+            int score = 0;
+            for (String token : significantTokens) {
+                if (entry.normalizedName.contains(token)) {
+                    score += 2;
+                }
+            }
+            if (score > 0 && entry.isMain) {
+                score += 1;
+            }
+            if (score > bestScore || (score == bestScore && score > 0 && bestEntry != null
+                    && entry.normalizedName.length() < bestEntry.normalizedName.length())) {
+                bestScore = score;
+                bestEntry = entry;
+            }
+        }
+        return bestEntry != null ? bestEntry.imageUrl : null;
+    }
+
+    private String stripNoiseTokens(String normalizedQuery) {
+        String[] tokens = normalizedQuery.split(" ");
+        StringBuilder sb = new StringBuilder();
+        for (String token : tokens) {
+            if (token.isEmpty() || NOISE_TOKENS.contains(token)) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(token);
+        }
+        return sb.toString();
     }
 
     private boolean containsAllTokens(String candidateKey, String[] queryTokens) {
@@ -400,14 +654,223 @@ public class ExerciseImageHelper {
             if (token.isEmpty()) {
                 continue;
             }
-            String singularToken = (token.endsWith("s") && token.length() > 3)
-                    ? token.substring(0, token.length() - 1)
-                    : token;
-            if (!candidateKey.contains(singularToken)) {
+            if (!candidateKey.contains(singularizeToken(token))) {
                 return false;
             }
         }
         return true;
+    }
+
+    private String singularizeToken(String token) {
+        if (token.endsWith("s") && token.length() > 3) {
+            return token.substring(0, token.length() - 1);
+        }
+        return token;
+    }
+
+    private static boolean containsAnyTerm(String text, String[] terms) {
+        for (String term : terms) {
+            if (text.contains(term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<KeywordRule> buildKeywordRules() {
+        List<KeywordRule> rules = new ArrayList<>();
+        // Specific multi-concept rules first so they are not shadowed by broader rules
+        rules.add(new KeywordRule(
+                new String[]{"incline"},
+                new String[]{"curl"},
+                null,
+                new String[]{"incline dumbbell curl", "incline curl", "dumbbell curl", "bicep curl", "curl"}));
+        rules.add(new KeywordRule(
+                new String[]{"incline"},
+                new String[]{"press", "bench", "chest"},
+                null,
+                new String[]{"incline bench press", "incline dumbbell press", "incline press", "bench press"}));
+        rules.add(new KeywordRule(
+                new String[]{"decline"},
+                null,
+                null,
+                new String[]{"decline bench press", "decline press", "bench press"}));
+        rules.add(new KeywordRule(
+                new String[]{"close"},
+                new String[]{"bench", "press"},
+                null,
+                new String[]{"close grip bench press", "bench press", "triceps"}));
+        rules.add(new KeywordRule(
+                new String[]{"pushdown", "push down"},
+                null,
+                null,
+                new String[]{"tricep pushdown", "pushdown", "triceps extension", "cable extension"}));
+        rules.add(new KeywordRule(
+                new String[]{"push up", "pushup", "push"},
+                null,
+                new String[]{"pushdown", "push down"},
+                new String[]{"push up", "push ups", "pushup", "pushups", "push"}));
+        rules.add(new KeywordRule(
+                new String[]{"pulldown", "pull down"},
+                null,
+                null,
+                new String[]{"lat pulldown", "pulldown", "pull down"}));
+        rules.add(new KeywordRule(
+                new String[]{"face"},
+                new String[]{"pull"},
+                null,
+                new String[]{"face pull", "rear delt", "cable row", "row"}));
+        rules.add(new KeywordRule(
+                new String[]{"pull up", "pullup", "chin up", "chinup", "dead hang"},
+                null,
+                null,
+                new String[]{"pull up", "pull ups", "pullup", "chin up", "lat pulldown"}));
+        rules.add(new KeywordRule(
+                new String[]{"leg", "hamstring"},
+                new String[]{"curl"},
+                null,
+                new String[]{"leg curl", "lying leg curl", "seated leg curl", "hamstring curl"}));
+        rules.add(new KeywordRule(
+                new String[]{"wrist", "forearm"},
+                new String[]{"curl"},
+                null,
+                new String[]{"wrist curl", "forearm curl", "reverse curl", "barbell curl", "curl"}));
+        rules.add(new KeywordRule(
+                new String[]{"hammer"},
+                new String[]{"curl"},
+                null,
+                new String[]{"hammer curl", "dumbbell curl", "bicep curl", "curl"}));
+        rules.add(new KeywordRule(
+                new String[]{"preacher"},
+                new String[]{"curl"},
+                null,
+                new String[]{"preacher curl", "scott curl", "barbell curl", "curl"}));
+        rules.add(new KeywordRule(
+                new String[]{"curl"},
+                null,
+                new String[]{"leg", "hamstring", "wrist"},
+                new String[]{"bicep curl", "barbell curl", "dumbbell curl", "cable curl", "curl"}));
+        rules.add(new KeywordRule(
+                new String[]{"leg"},
+                new String[]{"extension"},
+                null,
+                new String[]{"leg extension", "leg extensions", "quad extension"}));
+        rules.add(new KeywordRule(
+                new String[]{"skull", "french press", "tricep", "extension"},
+                null,
+                new String[]{"leg"},
+                new String[]{"skull crusher", "french press", "triceps extension", "tricep extension", "overhead extension", "extension"}));
+        rules.add(new KeywordRule(
+                new String[]{"calf"},
+                null,
+                null,
+                new String[]{"calf raise", "calf raises", "standing calf raise", "seated calf raise", "calf"}));
+        rules.add(new KeywordRule(
+                new String[]{"lateral"},
+                new String[]{"raise"},
+                null,
+                new String[]{"lateral raise", "side lateral raise", "lateral raises"}));
+        rules.add(new KeywordRule(
+                new String[]{"front"},
+                new String[]{"raise"},
+                null,
+                new String[]{"front raise", "front raises", "lateral raise"}));
+        rules.add(new KeywordRule(
+                new String[]{"leg", "knee", "hanging"},
+                new String[]{"raise"},
+                null,
+                new String[]{"hanging leg raise", "leg raise", "leg raises", "crunch"}));
+        rules.add(new KeywordRule(
+                new String[]{"raise"},
+                null,
+                null,
+                new String[]{"lateral raise", "calf raise", "raise"}));
+        rules.add(new KeywordRule(
+                new String[]{"leg press"},
+                null,
+                null,
+                new String[]{"leg press", "squat"}));
+        rules.add(new KeywordRule(
+                new String[]{"squat"},
+                null,
+                null,
+                new String[]{"squat", "squats", "barbell squat", "back squat", "split squat"}));
+        rules.add(new KeywordRule(
+                new String[]{"lunge", "step up"},
+                null,
+                null,
+                new String[]{"lunges", "lunge", "walking lunge", "step up", "split squat", "squat"}));
+        rules.add(new KeywordRule(
+                new String[]{"romanian", "stiff"},
+                new String[]{"deadlift"},
+                null,
+                new String[]{"romanian deadlift", "stiff legged deadlift", "deadlift", "deadlifts"}));
+        rules.add(new KeywordRule(
+                new String[]{"deadlift", "good morning"},
+                null,
+                null,
+                new String[]{"deadlift", "deadlifts", "romanian deadlift"}));
+        rules.add(new KeywordRule(
+                new String[]{"row"},
+                null,
+                null,
+                new String[]{"bent over row", "barbell row", "cable row", "dumbbell row", "row"}));
+        rules.add(new KeywordRule(
+                new String[]{"bench"},
+                new String[]{"press"},
+                null,
+                new String[]{"bench press", "barbell bench press", "dumbbell bench press"}));
+        rules.add(new KeywordRule(
+                new String[]{"shoulder", "overhead", "military"},
+                new String[]{"press"},
+                null,
+                new String[]{"shoulder press", "overhead press", "military press", "dumbbell press"}));
+        rules.add(new KeywordRule(
+                new String[]{"dip"},
+                null,
+                null,
+                new String[]{"dips", "dip", "chest dip", "tricep dip"}));
+        rules.add(new KeywordRule(
+                new String[]{"rear"},
+                new String[]{"fly", "delt"},
+                null,
+                new String[]{"rear delt fly", "reverse fly", "butterfly", "fly"}));
+        rules.add(new KeywordRule(
+                new String[]{"fly", "crossover"},
+                null,
+                null,
+                new String[]{"cable crossover", "dumbbell fly", "chest fly", "butterfly", "flyes", "fly"}));
+        rules.add(new KeywordRule(
+                new String[]{"hip thrust", "glute", "bridge", "kickback"},
+                null,
+                null,
+                new String[]{"hip thrust", "glute bridge", "bridge", "kickback", "squat"}));
+        rules.add(new KeywordRule(
+                new String[]{"plank"},
+                null,
+                null,
+                new String[]{"plank", "side plank", "crunch"}));
+        rules.add(new KeywordRule(
+                new String[]{"twist", "rollout", "ab wheel"},
+                null,
+                null,
+                new String[]{"russian twist", "ab wheel", "crunch", "plank"}));
+        rules.add(new KeywordRule(
+                new String[]{"crunch", "sit up", "situp", "abs"},
+                null,
+                null,
+                new String[]{"crunches", "crunch", "sit up", "abdominal"}));
+        rules.add(new KeywordRule(
+                new String[]{"farmer", "shrug"},
+                null,
+                null,
+                new String[]{"shrug", "shrugs", "farmers walk", "deadlift"}));
+        rules.add(new KeywordRule(
+                new String[]{"press"},
+                null,
+                null,
+                new String[]{"bench press", "shoulder press", "leg press", "press"}));
+        return rules;
     }
 
     private String normalizeName(String name) {
@@ -415,6 +878,8 @@ public class ExerciseImageHelper {
             return "";
         }
         String cleaned = name.toLowerCase(Locale.US)
+                .replace("'", "")
+                .replace("’", "")
                 .replace('-', ' ')
                 .replace('_', ' ')
                 .replace('/', ' ')

@@ -10,5 +10,6 @@ public class FitTrackApp extends Application {
     public void onCreate() {
         super.onCreate();
         ThemeManager.applySavedTheme(this);
+        ExerciseImageHelper.getInstance().prefetchExercises(this);
     }
 }

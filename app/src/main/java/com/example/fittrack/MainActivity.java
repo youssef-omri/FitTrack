@@ -1,5 +1,6 @@
 package com.example.fittrack;
 
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
@@ -7,7 +8,9 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -156,6 +159,25 @@ public class MainActivity extends AppCompatActivity implements WorkoutAdapter.On
         Intent intent = new Intent(MainActivity.this, CreateEditRoutineActivity.class);
         intent.putExtra(CreateEditRoutineActivity.EXTRA_WORKOUT_ID, workout.getId());
         startActivity(intent);
+    }
+
+    @Override
+    public void onDeleteWorkoutClick(final Workout workout) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Routine?")
+                .setMessage("Are you sure you want to delete this workout routine?")
+                .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        boolean deleted = databaseHelper.deleteWorkout(workout.getId());
+                        if (deleted) {
+                            Toast.makeText(MainActivity.this, "Routine deleted.", Toast.LENGTH_SHORT).show();
+                        }
+                        loadUserWorkouts();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void redirectToLogin() {

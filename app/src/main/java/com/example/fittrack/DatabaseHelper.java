@@ -305,6 +305,28 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
+     * Deletes a workout routine and all of its exercises from the database.
+     */
+    public boolean deleteWorkout(long workoutId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.delete(TABLE_WORKOUT_EXERCISES,
+                    COLUMN_EXERCISE_WORKOUT_ID + " = ?",
+                    new String[]{String.valueOf(workoutId)});
+            int rows = db.delete(TABLE_WORKOUTS,
+                    COLUMN_WORKOUT_ID + " = ?",
+                    new String[]{String.valueOf(workoutId)});
+            db.setTransactionSuccessful();
+            return rows > 0;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /**
      * Adds an exercise to an existing workout.
      */
     public long addExerciseToWorkout(long workoutId, String exerciseName, int sets, int reps, double weight) {
@@ -443,6 +465,27 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         values.put(COLUMN_HISTORY_DATE, date);
         values.put(COLUMN_HISTORY_DURATION, duration != null ? duration : "");
         return db.insert(TABLE_WORKOUT_HISTORY, null, values);
+    }
+
+    /**
+     * Deletes a single workout history entry by its ID.
+     */
+    public boolean deleteHistoryEntry(long historyId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        int rows = db.delete(TABLE_WORKOUT_HISTORY,
+                COLUMN_HISTORY_ID + " = ?",
+                new String[]{String.valueOf(historyId)});
+        return rows > 0;
+    }
+
+    /**
+     * Deletes all workout history entries for the specified user.
+     */
+    public int clearUserWorkoutHistory(long userId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        return db.delete(TABLE_WORKOUT_HISTORY,
+                COLUMN_HISTORY_USER_ID + " = ?",
+                new String[]{String.valueOf(userId)});
     }
 
     /**

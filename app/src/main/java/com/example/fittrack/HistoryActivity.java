@@ -1,12 +1,15 @@
 package com.example.fittrack;
 
+import android.content.DialogInterface;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -16,12 +19,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class HistoryActivity extends AppCompatActivity {
+public class HistoryActivity extends AppCompatActivity implements HistoryAdapter.OnHistoryItemDeleteListener {
 
     private SessionManager sessionManager;
     private DatabaseHelper databaseHelper;
 
     private ImageButton btnHistoryBack;
+    private Button btnClearHistory;
     private TextView tvTotalSessionsCount;
     private TextView tvTotalExercisesCount;
     private TextView tvTotalProgressCount;
@@ -48,6 +52,7 @@ public class HistoryActivity extends AppCompatActivity {
         databaseHelper = new DatabaseHelper(this);
 
         btnHistoryBack = findViewById(R.id.btnHistoryBack);
+        btnClearHistory = findViewById(R.id.btnClearHistory);
         tvTotalSessionsCount = findViewById(R.id.tvTotalSessionsCount);
         tvTotalExercisesCount = findViewById(R.id.tvTotalExercisesCount);
         tvTotalProgressCount = findViewById(R.id.tvTotalProgressCount);
@@ -63,6 +68,13 @@ public class HistoryActivity extends AppCompatActivity {
             }
         });
 
+        btnClearHistory.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                confirmClearAllHistory();
+            }
+        });
+
         btnStartFirstWorkout.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -71,7 +83,7 @@ public class HistoryActivity extends AppCompatActivity {
         });
 
         dateGroupList = new ArrayList<>();
-        historyAdapter = new HistoryAdapter(this, dateGroupList);
+        historyAdapter = new HistoryAdapter(this, dateGroupList, this);
         rvWorkoutHistory.setLayoutManager(new LinearLayoutManager(this));
         rvWorkoutHistory.setAdapter(historyAdapter);
 
@@ -91,12 +103,15 @@ public class HistoryActivity extends AppCompatActivity {
         dateGroupList.clear();
 
         if (historyItems == null || historyItems.isEmpty()) {
+            historyAdapter.notifyDataSetChanged();
+            btnClearHistory.setVisibility(View.GONE);
             llHistorySummaryBar.setVisibility(View.GONE);
             rvWorkoutHistory.setVisibility(View.GONE);
             llHistoryEmptyState.setVisibility(View.VISIBLE);
             return;
         }
 
+        btnClearHistory.setVisibility(View.VISIBLE);
         llHistoryEmptyState.setVisibility(View.GONE);
         llHistorySummaryBar.setVisibility(View.VISIBLE);
         rvWorkoutHistory.setVisibility(View.VISIBLE);
@@ -132,5 +147,41 @@ public class HistoryActivity extends AppCompatActivity {
         tvTotalSessionsCount.setText(String.valueOf(dateGroupList.size()));
         tvTotalExercisesCount.setText(String.valueOf(historyItems.size()));
         tvTotalProgressCount.setText(String.valueOf(progressGainsCount));
+    }
+
+    private void confirmClearAllHistory() {
+        new AlertDialog.Builder(this)
+                .setTitle("Clear All History?")
+                .setMessage("Are you sure you want to delete all workout history? This action cannot be undone.")
+                .setPositiveButton("Clear All", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        long userId = sessionManager.getUserId();
+                        databaseHelper.clearUserWorkoutHistory(userId);
+                        Toast.makeText(HistoryActivity.this, "Workout history cleared.", Toast.LENGTH_SHORT).show();
+                        loadWorkoutHistory();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    @Override
+    public void onDeleteHistoryItem(final WorkoutHistoryItem item) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Entry?")
+                .setMessage("Are you sure you want to delete \"" + item.getExerciseName() + "\" from your history?")
+                .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        boolean deleted = databaseHelper.deleteHistoryEntry(item.getId());
+                        if (deleted) {
+                            Toast.makeText(HistoryActivity.this, "History entry deleted.", Toast.LENGTH_SHORT).show();
+                        }
+                        loadWorkoutHistory();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 }
