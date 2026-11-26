@@ -1,12 +1,15 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme (Dark Mode). -->
+    <!-- Base application theme (Dark Mode) — optimized for Material You / Android 12+ -->
     <style name="Base.Theme.FitTrack" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Brand colours (dark palette) -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>
         <item name="colorOnPrimary">@color/white</item>
         <item name="colorSecondary">@color/accent</item>
         <item name="colorSecondaryVariant">@color/accent</item>
         <item name="colorOnSecondary">@color/white</item>
+
+        <!-- Surfaces & text -->
         <item name="android:colorBackground">@color/bg_light</item>
         <item name="colorSurface">@color/surface</item>
         <item name="colorOnSurface">@color/text_primary</item>
@@ -15,10 +18,36 @@
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
         <item name="android:textColorHint">@color/text_hint</item>
-        <item name="android:statusBarColor">@color/surface</item>
-        <item name="android:windowLightStatusBar">false</item>
         <item name="colorControlNormal">@color/text_primary</item>
+
+        <!-- Modern edge-to-edge status bar -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
+
+        <!-- Hardware-accelerated smooth rendering -->
+        <item name="android:hardwareAccelerated">true</item>
+
+        <!-- Smooth window animations -->
+        <item name="android:windowAnimationStyle">@style/Animation.FitTrack.Activity</item>
     </style>
 
     <style name="Theme.FitTrack" parent="Base.Theme.FitTrack" />
+
+    <!-- Splash screen theme (dark) -->
+    <style name="Theme.FitTrack.Splash" parent="Theme.FitTrack">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:statusBarColor">@color/primary_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- Smooth activity transition animations -->
+    <style name="Animation.FitTrack.Activity" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/slide_in_right</item>
+        <item name="android:activityOpenExitAnimation">@anim/slide_out_left</item>
+        <item name="android:activityCloseEnterAnimation">@anim/slide_in_left</item>
+        <item name="android:activityCloseExitAnimation">@anim/slide_out_right</item>
+    </style>
 </resources>

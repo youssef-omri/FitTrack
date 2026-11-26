@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -11,6 +12,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.WindowCompat;
 
 public class LoginActivity extends AppCompatActivity {
 
@@ -25,7 +27,12 @@ public class LoginActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Transition from splash theme to real theme before setContentView
+        setTheme(R.style.Theme_FitTrack);
         super.onCreate(savedInstanceState);
+
+        // Enable edge-to-edge rendering for modern Android
+        WindowCompat.setDecorFitsSystemWindows(this, false);
 
         sessionManager = new SessionManager(this);
 
