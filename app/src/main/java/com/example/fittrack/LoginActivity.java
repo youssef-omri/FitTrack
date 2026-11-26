@@ -32,7 +32,7 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         // Enable edge-to-edge rendering for modern Android
-        WindowCompat.setDecorFitsSystemWindows(this, false);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
 
         sessionManager = new SessionManager(this);
 
