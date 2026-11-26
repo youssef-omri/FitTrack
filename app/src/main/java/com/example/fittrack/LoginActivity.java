@@ -101,10 +101,8 @@ public class LoginActivity extends AppCompatActivity {
         // Authenticate with SQLite database
         long userId = databaseHelper.authenticateUser(username, password);
         if (userId != -1) {
-            // Save session to SharedPreferences if remember me is checked
-            if (cbRememberMe.isChecked()) {
-                sessionManager.createLoginSession(userId, username);
-            }
+            // Always save the session so MainActivity can verify login
+            sessionManager.createLoginSession(userId, username);
 
             Toast.makeText(this, getString(R.string.login_success), Toast.LENGTH_SHORT).show();
             navigateToMainActivity();
